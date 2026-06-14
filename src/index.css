@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+@layer utilities {
+  .font-sans {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+}
+
+@media print {
+  /* Hide sidebar and controls */
+  aside,
+  .no-print {
+    display: none !important;
+  }
+
+  /* Full width main content */
+  body {
+    background: white !important;
+  }
+
+  main {
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  .print-content,
+  #trustee-report {
+    display: block !important;
+  }
+
+  /* Ensure page breaks don't split cards awkwardly */
+  .print-content > div {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Remove shadows and use borders for print */
+  .shadow-sm {
+    box-shadow: none !important;
+  }
+
+  /* Page margins */
+  @page {
+    margin: 16mm 12mm;
+    size: A4;
+  }
+
+  /* Make flex layout full width */
+  .flex.min-h-screen {
+    display: block !important;
+  }
+
+  main > div {
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+}
