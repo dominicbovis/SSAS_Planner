@@ -38,39 +38,41 @@ export default function GaugeChart({ value, max, label, color, formatValue }: Ga
 
   return (
     <div className="flex flex-col items-center">
-      <svg viewBox="0 0 220 130" className="w-full max-w-[220px]">
-        {/* Track arc */}
-        <path
-          d={`M ${polarToXY(0).x} ${polarToXY(0).y} A ${r} ${r} 0 0 1 ${polarToXY(180).x} ${polarToXY(180).y}`}
-          fill="none"
-          stroke={c.track}
-          strokeWidth="16"
-          strokeLinecap="round"
-        />
-        {/* Value arc */}
-        {pct > 0 && (
+      <svg viewBox="0 0 240 140" className="w-full max-w-[240px]">
+        <g transform="translate(10,5)">
+          {/* Track arc */}
           <path
-            d={`M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 1 ${end.x} ${end.y}`}
+            d={`M ${polarToXY(0).x} ${polarToXY(0).y} A ${r} ${r} 0 0 1 ${polarToXY(180).x} ${polarToXY(180).y}`}
             fill="none"
-            stroke={c.fill}
+            stroke={c.track}
             strokeWidth="16"
             strokeLinecap="round"
           />
-        )}
-        {/* Center text */}
-        <text x={cx} y={cy - 4} textAnchor="middle" className="font-bold" fill={c.text} style={{ fontSize: 18, fontWeight: 700 }}>
-          {fmt(value)}
-        </text>
-        <text x={cx} y={cy + 16} textAnchor="middle" fill="#6b7280" style={{ fontSize: 11 }}>
-          {usedPct}% used
-        </text>
-        {/* Min / Max labels */}
-        <text x={polarToXY(0).x - 8} y={cy + 18} textAnchor="end" fill="#9ca3af" style={{ fontSize: 9 }}>
-          £0
-        </text>
-        <text x={polarToXY(180).x + 8} y={cy + 18} textAnchor="start" fill="#9ca3af" style={{ fontSize: 9 }}>
-          {fmt(max)}
-        </text>
+          {/* Value arc */}
+          {pct > 0 && (
+            <path
+              d={`M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 1 ${end.x} ${end.y}`}
+              fill="none"
+              stroke={c.fill}
+              strokeWidth="16"
+              strokeLinecap="round"
+            />
+          )}
+          {/* Center text */}
+          <text x={cx} y={cy - 4} textAnchor="middle" fill={c.text} style={{ fontSize: 18, fontWeight: 700 }}>
+            {fmt(value)}
+          </text>
+          <text x={cx} y={cy + 16} textAnchor="middle" fill="#6b7280" style={{ fontSize: 11 }}>
+            {usedPct}% used
+          </text>
+          {/* Min / Max labels */}
+          <text x={polarToXY(0).x - 4} y={cy + 20} textAnchor="end" fill="#9ca3af" style={{ fontSize: 9 }}>
+            £0
+          </text>
+          <text x={210} y={cy + 20} textAnchor="end" fill="#9ca3af" style={{ fontSize: 9 }}>
+            {fmt(max)}
+          </text>
+        </g>
       </svg>
       <p className="text-xs font-semibold text-gray-600 text-center mt-1 leading-tight">{label}</p>
     </div>
