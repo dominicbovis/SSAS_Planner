@@ -441,9 +441,8 @@ interface Totals { loanbacks: number; borrowing: number; employer: number; }
 export default function Scenarios({ scheme }: Props) {
   const [scenarios, setScenarios] = useState<ScenarioRecord[]>([]);
   const [actions, setActions] = useState<Record<string, ScenarioAction[]>>({});
-  const [active, setActive] = useState<ScenarioRecord | null>(null);
   const [totals, setTotals] = useState<Totals>({ loanbacks: 0, borrowing: 0, employer: 0 });
-  const [saving, setSaving] = useState(false);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
   const [showDescFor, setShowDescFor] = useState<Record<string, boolean>>({});
   const [showFormFor, setShowFormFor] = useState<string | null>(null);
   const [editingActionId, setEditingActionId] = useState<string | null>(null);
@@ -451,6 +450,9 @@ export default function Scenarios({ scheme }: Props) {
 
   const nav = Number(scheme.net_asset_value);
   const cash = Number(scheme.cash_balance);
+
+  // All scenarios currently toggled on — stacked together
+  const activeScenarios = scenarios.filter(s => s.is_active);
 
   const load = useCallback(async () => {
     const [{ data: sc }, lb, borrow, emp, { data: acts }] = await Promise.all([
@@ -461,7 +463,6 @@ export default function Scenarios({ scheme }: Props) {
       supabase.from('scenario_actions').select('*').eq('scheme_id', scheme.id).order('created_at'),
     ]);
     setScenarios(sc ?? []);
-    setActive((sc ?? []).find(s => s.is_active) ?? null);
     setTotals({
       loanbacks: (lb.data ?? []).reduce((s, r) => s + Number(r.outstanding_balance), 0),
       borrowing: (borrow.data ?? []).reduce((s, r) => s + Number(r.outstanding_balance), 0),
@@ -494,7 +495,6 @@ export default function Scenarios({ scheme }: Props) {
   async function updateScenarioName(id: string, scenario_name: string) {
     await supabase.from('scenarios').update({ scenario_name }).eq('id', id);
     setScenarios(s => s.map(sc => sc.id === id ? { ...sc, scenario_name } : sc));
-    if (active?.id === id) setActive(a => a ? { ...a, scenario_name } : a);
   }
 
   async function updateScenarioDesc(id: string, description: string) {
@@ -571,45 +571,64 @@ export default function Scenarios({ scheme }: Props) {
     setEditingActionId(null);
   }
 
-  async function activateScenario(scenario: ScenarioRecord) {
-    setSaving(true);
-    await supabase.from('scenarios').update({ is_active: false }).eq('scheme_id', scheme.id);
-    await supabase.from('scenarios').update({ is_active: true }).eq('id', scenario.id);
-    setScenarios(s => s.map(sc => ({ ...sc, is_active: sc.id === scenario.id })));
-    setActive({ ...scenario, is_active: true });
-    setSaving(false);
+  // Toggle a single scenario's active state independently
+  async function toggleScenario(scenario: ScenarioRecord) {
+    setTogglingId(scenario.id);
+    const next = !scenario.is_active;
+    await supabase.from('scenarios').update({ is_active: next }).eq('id', scenario.id);
+    setScenarios(s => s.map(sc => sc.id === scenario.id ? { ...sc, is_active: next } : sc));
+    setTogglingId(null);
   }
 
   async function removeScenario(id: string) {
     if (!confirm('Delete this scenario?')) return;
     await supabase.from('scenarios').delete().eq('id', id);
     setScenarios(s => s.filter(sc => sc.id !== id));
-    if (active?.id === id) setActive(null);
   }
 
-  // Active scenario computed values — always derived live from actions state
-  const activeAdj = active ? deriveAdjustments(actions[active.id] ?? [], nav) : null;
-  const scenarioNav = activeAdj ? nav + activeAdj.navDelta : nav;
-  const scenarioLoanbacks = activeAdj ? totals.loanbacks + activeAdj.loanbackDelta : totals.loanbacks;
-  const scenarioBorrowing = activeAdj ? totals.borrowing + activeAdj.borrowingDelta : totals.borrowing;
-  const scenarioEmployer = activeAdj ? totals.employer + activeAdj.employerDelta : totals.employer;
-  const scenarioCash = activeAdj ? cash + activeAdj.cashDelta : cash;
+  // Stacked adjustments — sum all active scenarios
+  const stackedAdj = activeScenarios.length > 0
+    ? activeScenarios.reduce(
+        (acc, sc) => {
+          const d = deriveAdjustments(actions[sc.id] ?? [], nav);
+          return {
+            navDelta: acc.navDelta + d.navDelta,
+            navAdjPct: acc.navAdjPct + d.navAdjPct,
+            loanbackDelta: acc.loanbackDelta + d.loanbackDelta,
+            borrowingDelta: acc.borrowingDelta + d.borrowingDelta,
+            employerDelta: acc.employerDelta + d.employerDelta,
+            cashDelta: acc.cashDelta + d.cashDelta,
+          };
+        },
+        { navDelta: 0, navAdjPct: 0, loanbackDelta: 0, borrowingDelta: 0, employerDelta: 0, cashDelta: 0 }
+      )
+    : null;
 
-  const sMaxLoanback = 0.5 * scenarioNav;
-  const sMaxBorrowing = 0.5 * scenarioNav;
-  const sMaxEmployer = 0.20 * scenarioNav;
+  const stackedNav = stackedAdj ? nav + stackedAdj.navDelta : nav;
+  const stackedCash = stackedAdj ? cash + stackedAdj.cashDelta : cash;
+  const stackedLoanbacks = stackedAdj ? totals.loanbacks + stackedAdj.loanbackDelta : totals.loanbacks;
+  const stackedBorrowing = stackedAdj ? totals.borrowing + stackedAdj.borrowingDelta : totals.borrowing;
+  const stackedEmployer = stackedAdj ? totals.employer + stackedAdj.employerDelta : totals.employer;
+
+  const sMaxLoanback = 0.5 * stackedNav;
+  const sMaxBorrowing = 0.5 * stackedNav;
+  const sMaxEmployer = 0.20 * stackedNav;
 
   const barSeries = [
-    { name: 'Scenario HMRC Limit', color: '#e5e7eb', values: [sMaxLoanback, sMaxBorrowing, sMaxEmployer] },
-    { name: 'Scenario Used', color: '#ef4444', values: [scenarioLoanbacks, scenarioBorrowing, scenarioEmployer] },
+    { name: 'Stacked HMRC Limit', color: '#e5e7eb', values: [sMaxLoanback, sMaxBorrowing, sMaxEmployer] },
+    { name: 'Stacked Used', color: '#ef4444', values: [stackedLoanbacks, stackedBorrowing, stackedEmployer] },
   ];
+
+  const stackedTitle = activeScenarios.length === 1
+    ? activeScenarios[0].scenario_name
+    : `${activeScenarios.length} Scenarios Stacked`;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Scenarios</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Add planned transactions to see their impact on HMRC limits</p>
+          <p className="text-sm text-gray-500 mt-0.5">Activate one or more scenarios to stack their impact on HMRC limits</p>
         </div>
         <button onClick={addScenario} className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors">
           <Plus size={16} /> New Scenario
@@ -638,6 +657,8 @@ export default function Scenarios({ scheme }: Props) {
               baseLoanbacks: totals.loanbacks, baseBorrowing: totals.borrowing, baseEmployer: totals.employer,
             }) : [];
 
+            const isToggling = togglingId === sc.id;
+
             return (
               <div key={sc.id} className={`bg-white rounded-xl border shadow-sm transition-all ${sc.is_active ? 'border-red-300 ring-1 ring-red-200' : 'border-gray-100'}`}>
                 {/* Header */}
@@ -653,16 +674,10 @@ export default function Scenarios({ scheme }: Props) {
                           className="w-full text-sm font-semibold border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500"
                         />
                       </div>
-                      {sc.is_active && (
-                        <div className="mt-5 flex items-center gap-1.5 px-2.5 py-1 bg-red-50 border border-red-200 rounded-lg">
-                          <Check size={12} className="text-red-600" />
-                          <span className="text-xs font-semibold text-red-700">Active</span>
-                        </div>
-                      )}
                       {issues.some(i => i.severity === 'error') && (
-                        <div className="mt-5 flex items-center gap-1.5 px-2.5 py-1 bg-red-50 border border-red-200 rounded-lg">
-                          <AlertTriangle size={12} className="text-red-600" />
-                          <span className="text-xs font-semibold text-red-700">{issues.filter(i => i.severity === 'error').length} issue{issues.filter(i => i.severity === 'error').length > 1 ? 's' : ''}</span>
+                        <div className="mt-5 flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 border border-amber-200 rounded-lg">
+                          <AlertTriangle size={12} className="text-amber-600" />
+                          <span className="text-xs font-semibold text-amber-700">{issues.filter(i => i.severity === 'error').length} issue{issues.filter(i => i.severity === 'error').length > 1 ? 's' : ''}</span>
                         </div>
                       )}
                     </div>
@@ -686,15 +701,18 @@ export default function Scenarios({ scheme }: Props) {
                   </div>
 
                   <div className="flex flex-col gap-2 shrink-0 mt-4">
-                    {!sc.is_active && (
-                      <button
-                        onClick={() => activateScenario(sc)}
-                        disabled={saving}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
-                      >
-                        Activate
-                      </button>
-                    )}
+                    {/* Toggle active button */}
+                    <button
+                      onClick={() => toggleScenario(sc)}
+                      disabled={isToggling}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
+                        sc.is_active
+                          ? 'bg-red-50 border-red-300 text-red-700 hover:bg-red-100'
+                          : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      {sc.is_active ? <><Check size={11} /> Active</> : 'Activate'}
+                    </button>
                     <button onClick={() => removeScenario(sc.id)} className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors">
                       <Trash2 size={14} />
                     </button>
@@ -869,19 +887,31 @@ export default function Scenarios({ scheme }: Props) {
         </div>
       )}
 
-      {/* Active scenario outputs */}
-      {active && (
+      {/* Stacked scenario outputs — shown when one or more scenarios are active */}
+      {activeScenarios.length > 0 && (
         <>
+          {/* Active scenario pills */}
+          {activeScenarios.length > 1 && (
+            <div className="flex flex-wrap gap-2 items-center">
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Stacking:</span>
+              {activeScenarios.map(sc => (
+                <span key={sc.id} className="flex items-center gap-1 px-2.5 py-1 bg-red-50 border border-red-200 rounded-full text-xs font-medium text-red-700">
+                  <Check size={10} /> {sc.scenario_name}
+                </span>
+              ))}
+            </div>
+          )}
+
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
             <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-4">
-              Scenario Position — {active.scenario_name}
+              {activeScenarios.length > 1 ? 'Stacked Scenario Position' : `Scenario Position — ${stackedTitle}`}
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {[
-                { label: 'Scenario NAV', value: scenarioNav, base: nav },
-                { label: 'Scenario Cash', value: scenarioCash, base: cash },
-                { label: 'Scenario Loanbacks', value: scenarioLoanbacks, base: totals.loanbacks },
-                { label: 'Scenario Borrowing', value: scenarioBorrowing, base: totals.borrowing },
+                { label: 'Stacked NAV', value: stackedNav, base: nav },
+                { label: 'Stacked Cash', value: stackedCash, base: cash },
+                { label: 'Stacked Loanbacks', value: stackedLoanbacks, base: totals.loanbacks },
+                { label: 'Stacked Borrowing', value: stackedBorrowing, base: totals.borrowing },
               ].map(({ label, value, base }) => {
                 const delta = value - base;
                 return (
@@ -901,9 +931,9 @@ export default function Scenarios({ scheme }: Props) {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[
-              { label: 'Scenario Loanback Capacity', value: scenarioLoanbacks, max: sMaxLoanback, sublabel: 'vs 50% Scenario NAV limit' },
-              { label: 'Scenario Borrowing Capacity', value: scenarioBorrowing, max: sMaxBorrowing, sublabel: 'vs 50% Scenario NAV limit' },
-              { label: 'Scenario Employer Inv. Capacity', value: scenarioEmployer, max: sMaxEmployer, sublabel: 'vs 20% Scenario NAV limit' },
+              { label: 'Loanback Capacity', value: stackedLoanbacks, max: sMaxLoanback, sublabel: 'vs 50% Stacked NAV limit' },
+              { label: 'Borrowing Capacity', value: stackedBorrowing, max: sMaxBorrowing, sublabel: 'vs 50% Stacked NAV limit' },
+              { label: 'Employer Inv. Capacity', value: stackedEmployer, max: sMaxEmployer, sublabel: 'vs 20% Stacked NAV limit' },
             ].map(g => (
               <div key={g.label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 flex flex-col items-center">
                 <GaugeChart value={g.value} max={g.max} label={g.sublabel} color={gaugeColor(g.value, g.max)} />
@@ -914,29 +944,31 @@ export default function Scenarios({ scheme }: Props) {
 
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
             <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-4">
-              Scenario HMRC Capacity vs Usage — {active.scenario_name}
+              HMRC Capacity vs Usage — {stackedTitle}
             </h2>
             <BarChart categories={['Loanback', 'Borrowing', 'Employer Inv.']} series={barSeries} />
           </div>
 
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
             <div className="px-6 py-4 border-b border-gray-100">
-              <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Scenario Capacity Summary</h2>
+              <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                {activeScenarios.length > 1 ? 'Stacked Capacity Summary' : 'Scenario Capacity Summary'}
+              </h2>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-100">
-                    {['Category', 'Current (Base)', 'Scenario Value', 'Scenario Limit', 'Remaining', 'Status'].map(h => (
+                    {['Category', 'Current (Base)', 'Stacked Value', 'Stacked Limit', 'Remaining', 'Status'].map(h => (
                       <th key={h} className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {[
-                    { cat: 'Loanback', base: totals.loanbacks, scenario: scenarioLoanbacks, limit: sMaxLoanback },
-                    { cat: 'Borrowing', base: totals.borrowing, scenario: scenarioBorrowing, limit: sMaxBorrowing },
-                    { cat: 'Employer Investments', base: totals.employer, scenario: scenarioEmployer, limit: sMaxEmployer },
+                    { cat: 'Loanback', base: totals.loanbacks, scenario: stackedLoanbacks, limit: sMaxLoanback },
+                    { cat: 'Borrowing', base: totals.borrowing, scenario: stackedBorrowing, limit: sMaxBorrowing },
+                    { cat: 'Employer Investments', base: totals.employer, scenario: stackedEmployer, limit: sMaxEmployer },
                   ].map(r => {
                     const rem = r.limit - r.scenario;
                     const status = rem < 0 ? 'Breach' : rem < 0.1 * r.limit ? 'Warning' : 'OK';
@@ -959,9 +991,9 @@ export default function Scenarios({ scheme }: Props) {
         </>
       )}
 
-      {!active && scenarios.length > 0 && (
+      {activeScenarios.length === 0 && scenarios.length > 0 && (
         <div className="bg-amber-50 rounded-xl border border-amber-100 p-5 text-sm text-amber-700 text-center">
-          Activate a scenario above to view gauge outputs and capacity analysis.
+          Activate one or more scenarios above to view stacked gauge outputs and capacity analysis.
         </div>
       )}
     </div>
