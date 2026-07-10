@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { SsasScheme, ScenarioRecord, ScenarioAction, ScenarioActionType } from '../types';
 import GaugeChart from '../components/GaugeChart';
 import BarChart from '../components/BarChart';
+import CashWaterfallChart, { WaterfallStep } from '../components/CashWaterfallChart';
 import { fmt, fmtFull } from '../lib/format';
 
 // ─── Action metadata ────────────────────────────────────────────────────────
@@ -927,6 +928,41 @@ export default function Scenarios({ scheme }: Props) {
                 );
               })}
             </div>
+          </div>
+
+          {/* Cash waterfall chart */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+            <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-1">
+              Cash Position Impact
+            </h2>
+            <p className="text-xs text-gray-400 mb-4">
+              How each active scenario draws down cash from the base position
+            </p>
+            <CashWaterfallChart
+              steps={(() => {
+                const waterfallSteps: WaterfallStep[] = [
+                  { label: 'Base Cash', delta: 0, runningTotal: cash, type: 'base' },
+                ];
+                let running = cash;
+                for (const sc of activeScenarios) {
+                  const d = deriveAdjustments(actions[sc.id] ?? [], nav);
+                  running += d.cashDelta;
+                  waterfallSteps.push({
+                    label: sc.scenario_name,
+                    delta: d.cashDelta,
+                    runningTotal: running,
+                    type: 'change',
+                  });
+                }
+                waterfallSteps.push({
+                  label: activeScenarios.length > 1 ? 'Combined' : 'Result',
+                  delta: 0,
+                  runningTotal: stackedCash,
+                  type: 'total',
+                });
+                return waterfallSteps;
+              })()}
+            />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
