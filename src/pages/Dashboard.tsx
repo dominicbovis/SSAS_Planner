@@ -161,6 +161,7 @@ export default function Dashboard({ scheme, onSchemeUpdate }: DashboardProps) {
   // Compute scenario adjustments (cash + NAV delta from actions and pending transfers)
   let scenarioCashDelta = 0;
   let scenarioNavDelta = 0;
+  let scenarioPropertyDelta = 0;
   if (activeScenarios.length > 0) {
     for (const a of scenarioActions) {
       const amt = Number(a.amount);
@@ -171,6 +172,7 @@ export default function Dashboard({ scheme, onSchemeUpdate }: DashboardProps) {
           const assetVal = a.asset_value != null ? Number(a.asset_value) : amt;
           scenarioNavDelta += assetVal - amt;
           scenarioCashDelta -= amt;
+          scenarioPropertyDelta += assetVal;
           break;
         }
         case 'loanback': scenarioCashDelta -= amt; break;
@@ -199,7 +201,7 @@ export default function Dashboard({ scheme, onSchemeUpdate }: DashboardProps) {
   const remainingEmployer = maxEmployer - totals.employer;
 
   const utilTable = [
-    { type: 'Commercial Property', amount: totals.property, limit: 'No HMRC limit', remaining: 'N/A', status: 'OK' },
+    { type: 'Commercial Property', amount: scenarioProperty, limit: 'No HMRC limit', remaining: 'N/A', status: 'OK' },
     { type: 'Loanbacks', amount: totals.loanbacks, limit: fmt(maxLoanback), remaining: fmt(remainingLoanback), status: capacityStatus(remainingLoanback, maxLoanback) },
     { type: 'Third-Party Loans', amount: totals.thirdParty, limit: 'N/A', remaining: 'N/A', status: 'OK' },
     { type: 'Fund Investments', amount: totals.funds, limit: 'No specific limit', remaining: 'N/A', status: 'OK' },
@@ -207,15 +209,17 @@ export default function Dashboard({ scheme, onSchemeUpdate }: DashboardProps) {
     { type: 'Employer Investments', amount: totals.employer, limit: fmt(maxEmployer), remaining: fmt(remainingEmployer), status: capacityStatus(remainingEmployer, maxEmployer) },
   ];
 
+  const scenarioProperty = totals.property + scenarioPropertyDelta;
+
   const pieSlices = [
-    { label: 'Cash', value: cash, color: PIE_COLORS[0] },
-    { label: 'Commercial Property', value: totals.property, color: PIE_COLORS[1] },
-    { label: 'Loanbacks', value: totals.loanbacks, color: PIE_COLORS[2] },
-    { label: 'Third-Party Loans', value: totals.thirdParty, color: PIE_COLORS[3] },
-    { label: 'Fund Investments', value: totals.funds, color: PIE_COLORS[6] },
-    { label: 'Borrowing', value: totals.borrowing, color: PIE_COLORS[4] },
-    { label: 'Employer Investments', value: totals.employer, color: PIE_COLORS[5] },
-  ];
+    { label: 'Cash', value: Math.max(0, cash), color: PIE_COLORS[0] },
+    { label: 'Commercial Property', value: Math.max(0, scenarioProperty), color: PIE_COLORS[1] },
+    { label: 'Loanbacks', value: Math.max(0, totals.loanbacks + scenarioLoanbackDelta), color: PIE_COLORS[2] },
+    { label: 'Third-Party Loans', value: Math.max(0, totals.thirdParty), color: PIE_COLORS[3] },
+    { label: 'Fund Investments', value: Math.max(0, totals.funds), color: PIE_COLORS[6] },
+    { label: 'Borrowing', value: Math.max(0, Math.abs(totals.borrowing + scenarioBorrowingDelta)), color: PIE_COLORS[4] },
+    { label: 'Employer Investments', value: Math.max(0, totals.employer + scenarioEmployerDelta), color: PIE_COLORS[5] },
+  ].filter(s => s.value > 0.01);
 
 
   const handleSave = async () => {
@@ -385,7 +389,7 @@ export default function Dashboard({ scheme, onSchemeUpdate }: DashboardProps) {
         {/* Read-only totals */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-5 border-t border-gray-100">
           {[
-            { label: 'Commercial Property', value: totals.property },
+            { label: 'Commercial Property', value: scenarioProperty },
             { label: 'Total Loanbacks', value: totals.loanbacks },
             { label: 'Third-Party Loans', value: totals.thirdParty },
             { label: 'Borrowing', value: totals.borrowing },
