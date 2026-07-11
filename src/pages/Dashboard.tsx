@@ -392,11 +392,11 @@ export default function Dashboard({ scheme, onSchemeUpdate }: DashboardProps) {
         {/* Read-only totals */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-5 border-t border-gray-100">
           {[
-            { label: 'Commercial Property', value: scenarioProperty },
-            { label: 'Total Loanbacks', value: totals.loanbacks },
-            { label: 'Third-Party Loans', value: totals.thirdParty },
-            { label: 'Borrowing', value: totals.borrowing },
-          ].map(({ label, value }) => (
+            { label: 'Commercial Property', value: scenarioProperty, show: scenarioProperty > 0.01 },
+            { label: 'Total Loanbacks', value: totals.loanbacks, show: totals.loanbacks > 0.01 },
+            { label: 'Third-Party Loans', value: totals.thirdParty, show: totals.thirdParty > 0.01 },
+            { label: 'Borrowing', value: totals.borrowing, show: Math.abs(totals.borrowing) > 0.01 },
+          ].filter(({ show }) => show).map(({ label, value }) => (
             <div key={label} className="space-y-0.5">
               <p className="text-xs text-gray-500">{label}</p>
               <p className="text-base font-semibold text-gray-800">{fmtFull(value)}</p>
