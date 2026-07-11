@@ -91,9 +91,9 @@ function actionToAdjustments(action: ScenarioAction): {
     case 'repay_loanback':
       return { navDelta: 0, loanbackDelta: -amt, borrowingDelta: 0, employerDelta: 0, cashDelta: amt };
     case 'borrow':
-      return { navDelta: amt, loanbackDelta: 0, borrowingDelta: amt, employerDelta: 0, cashDelta: amt };
+      return { navDelta: 0, loanbackDelta: 0, borrowingDelta: amt, employerDelta: 0, cashDelta: amt };
     case 'repay_borrowing':
-      return { navDelta: -amt, loanbackDelta: 0, borrowingDelta: -amt, employerDelta: 0, cashDelta: -amt };
+      return { navDelta: 0, loanbackDelta: 0, borrowingDelta: -amt, employerDelta: 0, cashDelta: -amt };
     case 'employer_investment':
       return { navDelta: 0, loanbackDelta: 0, borrowingDelta: 0, employerDelta: amt, cashDelta: -amt };
     case 'cash_in':
