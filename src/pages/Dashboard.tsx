@@ -200,6 +200,8 @@ export default function Dashboard({ scheme, onSchemeUpdate }: DashboardProps) {
   const remainingBorrowing = maxBorrowing - totals.borrowing;
   const remainingEmployer = maxEmployer - totals.employer;
 
+  const scenarioProperty = totals.property + scenarioPropertyDelta;
+
   const utilTable = [
     { type: 'Commercial Property', amount: scenarioProperty, limit: 'No HMRC limit', remaining: 'N/A', status: 'OK' },
     { type: 'Loanbacks', amount: totals.loanbacks, limit: fmt(maxLoanback), remaining: fmt(remainingLoanback), status: capacityStatus(remainingLoanback, maxLoanback) },
@@ -208,8 +210,6 @@ export default function Dashboard({ scheme, onSchemeUpdate }: DashboardProps) {
     { type: 'Borrowing', amount: totals.borrowing, limit: fmt(maxBorrowing), remaining: fmt(remainingBorrowing), status: capacityStatus(remainingBorrowing, maxBorrowing) },
     { type: 'Employer Investments', amount: totals.employer, limit: fmt(maxEmployer), remaining: fmt(remainingEmployer), status: capacityStatus(remainingEmployer, maxEmployer) },
   ];
-
-  const scenarioProperty = totals.property + scenarioPropertyDelta;
 
   const pieSlices = [
     { label: 'Cash', value: Math.max(0, cash), color: PIE_COLORS[0] },
