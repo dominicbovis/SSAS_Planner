@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, Sparkles, RotateCcw, Copy, Check } from 'lucide-react';
-import { supabase } from '../lib/supabase';
 import { SsasScheme } from '../types';
 import { fmtFull, fmt } from '../lib/format';
 
@@ -24,10 +23,10 @@ const SUGGESTED_QUESTIONS = [
   'Explain the 50% borrowing limit for SSAS schemes',
 ];
 
-function buildSchemeContext(scheme: SsasScheme): string {
+function buildSystemPrompt(scheme: SsasScheme): string {
   const nav = Number(scheme.net_asset_value);
   const cash = Number(scheme.cash_balance);
-  return [
+  const schemeContext = [
     `Scheme name: ${scheme.name}`,
     `Snapshot date: ${scheme.snapshot_date}`,
     `Net Asset Value (NAV): ${fmtFull(nav)}`,
@@ -37,6 +36,23 @@ function buildSchemeContext(scheme: SsasScheme): string {
     `HMRC employer investment limit (20% NAV): ${fmtFull(nav * 0.2)}`,
     `Cash as % of NAV: ${nav > 0 ? ((cash / nav) * 100).toFixed(1) : '0'}%`,
   ].join('\n');
+
+  return `You are a knowledgeable SSAS (Small Self-Administered Scheme) pension adviser embedded in a SSAS planning tool. You help trustees and scheme administrators understand their scheme, explore planning scenarios, ensure HMRC compliance, and make well-informed decisions.
+
+You have access to the scheme's current financial position:
+
+${schemeContext}
+
+Key HMRC rules for SSAS schemes you should reference when relevant:
+- Loanback limit: Maximum 50% of net asset value (NAV) can be lent back to sponsoring employers
+- Borrowing limit: Maximum 50% of NAV can be borrowed by the scheme
+- Employer-related investments: Maximum 20% of NAV in employer-related assets
+- Loanbacks must be secured by first charge, at commercial interest rates, repayable within 5 years
+- Properties must be commercial — residential property is prohibited
+- Member contributions attract tax relief; employer contributions are typically deductible
+- Benefits can only be taken from age 55 (rising to 57 in 2028)
+
+Answer questions clearly and practically. When discussing limits or compliance issues, reference the specific HMRC rules and the scheme's current numbers. If something requires professional advice beyond planning support, say so clearly. Be concise but thorough — trustees need accurate, actionable information.`;
 }
 
 export default function AskClaude({ scheme }: Props) {
@@ -71,24 +87,27 @@ export default function AskClaude({ scheme }: Props) {
 
     try {
       abortRef.current = new AbortController();
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
+      const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
+      if (!apiKey) {
+        throw new Error('VITE_ANTHROPIC_API_KEY is not set in .env');
+      }
 
-      const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ask-claude`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token ?? import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify({
-            messages: historyForApi,
-            schemeContext: buildSchemeContext(scheme),
-          }),
-          signal: abortRef.current.signal,
-        }
-      );
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 2048,
+          system: buildSystemPrompt(scheme),
+          messages: historyForApi,
+          stream: true,
+        }),
+        signal: abortRef.current.signal,
+      });
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
@@ -111,11 +130,15 @@ export default function AskClaude({ scheme }: Props) {
         for (const line of lines) {
           if (!line.startsWith('data: ')) continue;
           const data = line.slice(6).trim();
-          if (data === '[DONE]') break;
+          if (!data || data === '[DONE]') continue;
           try {
             const parsed = JSON.parse(data);
-            if (parsed.text) {
-              fullText += parsed.text;
+            if (
+              parsed.type === 'content_block_delta' &&
+              parsed.delta?.type === 'text_delta' &&
+              typeof parsed.delta.text === 'string'
+            ) {
+              fullText += parsed.delta.text;
               setMessages(prev => prev.map(m =>
                 m.id === assistantId ? { ...m, content: fullText } : m
               ));
