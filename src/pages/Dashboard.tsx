@@ -199,29 +199,32 @@ export default function Dashboard({ scheme, onSchemeUpdate }: DashboardProps) {
   const maxBorrowing = 0.5 * displayNav;
   const maxEmployer = 0.20 * displayNav;
 
-  const remainingLoanback = maxLoanback - totals.loanbacks;
-  const remainingBorrowing = maxBorrowing - totals.borrowing;
-  const remainingEmployer = maxEmployer - totals.employer;
+  const scenarioProperty = totals.property + (includeScenario ? scenarioPropertyDelta : 0);
+  const scenarioLoanback = totals.loanbacks + (includeScenario ? scenarioLoanbackDelta : 0);
+  const scenarioBorrowing = totals.borrowing + (includeScenario ? scenarioBorrowingDelta : 0);
+  const scenarioEmployer = totals.employer + (includeScenario ? scenarioEmployerDelta : 0);
 
-  const scenarioProperty = totals.property + scenarioPropertyDelta;
+  const remainingLoanback = maxLoanback - scenarioLoanback;
+  const remainingBorrowing = maxBorrowing - scenarioBorrowing;
+  const remainingEmployer = maxEmployer - scenarioEmployer;
 
   const utilTable = [
     { type: 'Commercial Property', amount: scenarioProperty, limit: 'No HMRC limit', remaining: 'N/A', status: 'OK' },
-    { type: 'Loanbacks', amount: totals.loanbacks, limit: fmt(maxLoanback), remaining: fmt(remainingLoanback), status: capacityStatus(remainingLoanback, maxLoanback) },
+    { type: 'Loanbacks', amount: scenarioLoanback, limit: fmt(maxLoanback), remaining: fmt(remainingLoanback), status: capacityStatus(remainingLoanback, maxLoanback) },
     { type: 'Third-Party Loans', amount: totals.thirdParty, limit: 'N/A', remaining: 'N/A', status: 'OK' },
     { type: 'Fund Investments', amount: totals.funds, limit: 'No specific limit', remaining: 'N/A', status: 'OK' },
-    { type: 'Borrowing', amount: totals.borrowing, limit: fmt(maxBorrowing), remaining: fmt(remainingBorrowing), status: capacityStatus(remainingBorrowing, maxBorrowing) },
-    { type: 'Employer Investments', amount: totals.employer, limit: fmt(maxEmployer), remaining: fmt(remainingEmployer), status: capacityStatus(remainingEmployer, maxEmployer) },
+    { type: 'Borrowing', amount: scenarioBorrowing, limit: fmt(maxBorrowing), remaining: fmt(remainingBorrowing), status: capacityStatus(remainingBorrowing, maxBorrowing) },
+    { type: 'Employer Investments', amount: scenarioEmployer, limit: fmt(maxEmployer), remaining: fmt(remainingEmployer), status: capacityStatus(remainingEmployer, maxEmployer) },
   ];
 
   const pieSlices = [
     { label: 'Cash', value: Math.max(0, cash), color: PIE_COLORS[0] },
     { label: 'Commercial Property', value: Math.max(0, scenarioProperty), color: PIE_COLORS[1] },
-    { label: 'Loanbacks', value: Math.max(0, totals.loanbacks + scenarioLoanbackDelta), color: PIE_COLORS[2] },
+    { label: 'Loanbacks', value: Math.max(0, scenarioLoanback), color: PIE_COLORS[2] },
     { label: 'Third-Party Loans', value: Math.max(0, totals.thirdParty), color: PIE_COLORS[3] },
     { label: 'Fund Investments', value: Math.max(0, totals.funds), color: PIE_COLORS[6] },
-    { label: 'Borrowing', value: Math.max(0, Math.abs(totals.borrowing + scenarioBorrowingDelta)), color: PIE_COLORS[4] },
-    { label: 'Employer Investments', value: Math.max(0, totals.employer + scenarioEmployerDelta), color: PIE_COLORS[5] },
+    { label: 'Borrowing', value: Math.max(0, Math.abs(scenarioBorrowing)), color: PIE_COLORS[4] },
+    { label: 'Employer Investments', value: Math.max(0, scenarioEmployer), color: PIE_COLORS[5] },
   ].filter(s => s.value > 0.01);
 
 
@@ -393,9 +396,9 @@ export default function Dashboard({ scheme, onSchemeUpdate }: DashboardProps) {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-5 border-t border-gray-100">
           {[
             { label: 'Commercial Property', value: scenarioProperty, show: scenarioProperty > 0.01 },
-            { label: 'Total Loanbacks', value: totals.loanbacks, show: totals.loanbacks > 0.01 },
+            { label: 'Total Loanbacks', value: scenarioLoanback, show: scenarioLoanback > 0.01 },
             { label: 'Third-Party Loans', value: totals.thirdParty, show: totals.thirdParty > 0.01 },
-            { label: 'Borrowing', value: totals.borrowing, show: Math.abs(totals.borrowing) > 0.01 },
+            { label: 'Borrowing', value: scenarioBorrowing, show: Math.abs(scenarioBorrowing) > 0.01 },
           ].filter(({ show }) => show).map(({ label, value }) => (
             <div key={label} className="space-y-0.5">
               <p className="text-xs text-gray-500">{label}</p>
@@ -417,21 +420,21 @@ export default function Dashboard({ scheme, onSchemeUpdate }: DashboardProps) {
             {[
               {
                 label: 'Loanbacks vs 50% Limit',
-                value: totals.loanbacks,
+                value: scenarioLoanback,
                 max: maxLoanback,
-                color: gaugeColor(totals.loanbacks, maxLoanback, 0.9),
+                color: gaugeColor(scenarioLoanback, maxLoanback, 0.9),
               },
               {
                 label: 'Borrowing vs 50% Limit',
-                value: totals.borrowing,
+                value: scenarioBorrowing,
                 max: maxBorrowing,
-                color: gaugeColor(totals.borrowing, maxBorrowing, 0.9),
+                color: gaugeColor(scenarioBorrowing, maxBorrowing, 0.9),
               },
               {
                 label: 'Employer Investments vs 20% Limit',
-                value: totals.employer,
+                value: scenarioEmployer,
                 max: maxEmployer,
-                color: gaugeColor(totals.employer, maxEmployer, 0.9),
+                color: gaugeColor(scenarioEmployer, maxEmployer, 0.9),
               },
             ].map(g => (
               <div key={g.label} className="flex flex-col items-center">
@@ -457,7 +460,7 @@ export default function Dashboard({ scheme, onSchemeUpdate }: DashboardProps) {
           </div>
           <dl className="space-y-2">
             <div className="flex justify-between text-sm"><dt className="text-gray-500">HMRC Limit (50%)</dt><dd className="font-semibold text-gray-800">{fmt(maxLoanback)}</dd></div>
-            <div className="flex justify-between text-sm"><dt className="text-gray-500">Used</dt><dd className="font-semibold text-gray-800">{fmt(totals.loanbacks)}</dd></div>
+            <div className="flex justify-between text-sm"><dt className="text-gray-500">Used</dt><dd className="font-semibold text-gray-800">{fmt(scenarioLoanback)}</dd></div>
             <div className="flex justify-between text-sm pt-2 border-t border-gray-100"><dt className="text-gray-500 font-medium">Remaining</dt><dd className={`font-bold ${remainingLoanback < 0 ? 'text-red-600' : 'text-emerald-600'}`}>{fmt(remainingLoanback)}</dd></div>
           </dl>
         </div>
@@ -470,7 +473,7 @@ export default function Dashboard({ scheme, onSchemeUpdate }: DashboardProps) {
           </div>
           <dl className="space-y-2">
             <div className="flex justify-between text-sm"><dt className="text-gray-500">HMRC Limit (50%)</dt><dd className="font-semibold text-gray-800">{fmt(maxBorrowing)}</dd></div>
-            <div className="flex justify-between text-sm"><dt className="text-gray-500">Used</dt><dd className="font-semibold text-gray-800">{fmt(totals.borrowing)}</dd></div>
+            <div className="flex justify-between text-sm"><dt className="text-gray-500">Used</dt><dd className="font-semibold text-gray-800">{fmt(scenarioBorrowing)}</dd></div>
             <div className="flex justify-between text-sm pt-2 border-t border-gray-100"><dt className="text-gray-500 font-medium">Remaining</dt><dd className={`font-bold ${remainingBorrowing < 0 ? 'text-red-600' : 'text-emerald-600'}`}>{fmt(remainingBorrowing)}</dd></div>
           </dl>
         </div>
@@ -484,7 +487,7 @@ export default function Dashboard({ scheme, onSchemeUpdate }: DashboardProps) {
           <dl className="space-y-2">
             <div className="flex justify-between text-sm"><dt className="text-gray-500">Per-employer limit (5%)</dt><dd className="font-semibold text-gray-800">{fmt(0.05 * displayNav)}</dd></div>
             <div className="flex justify-between text-sm"><dt className="text-gray-500">Aggregate limit (20%)</dt><dd className="font-semibold text-gray-800">{fmt(maxEmployer)}</dd></div>
-            <div className="flex justify-between text-sm"><dt className="text-gray-500">Aggregate used</dt><dd className="font-semibold text-gray-800">{fmt(totals.employer)}</dd></div>
+            <div className="flex justify-between text-sm"><dt className="text-gray-500">Aggregate used</dt><dd className="font-semibold text-gray-800">{fmt(scenarioEmployer)}</dd></div>
             <div className="flex justify-between text-sm pt-2 border-t border-gray-100"><dt className="text-gray-500 font-medium">Aggregate remaining</dt><dd className={`font-bold ${remainingEmployer < 0 ? 'text-red-600' : 'text-emerald-600'}`}>{fmt(remainingEmployer)}</dd></div>
           </dl>
         </div>
