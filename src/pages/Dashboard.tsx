@@ -3,7 +3,6 @@ import { Save, RefreshCw, ToggleLeft, ToggleRight } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { SsasScheme, ScenarioRecord, ScenarioAction, PendingTransfer } from '../types';
 import GaugeChart from '../components/GaugeChart';
-import PieChart from '../components/PieChart';
 import StatusBadge from '../components/StatusBadge';
 import CurrencyInput from '../components/CurrencyInput';
 import { fmt, fmtFull } from '../lib/format';
@@ -217,15 +216,17 @@ export default function Dashboard({ scheme, onSchemeUpdate }: DashboardProps) {
     { type: 'Employer Investments', amount: scenarioEmployer, limit: fmt(maxEmployer), remaining: fmt(remainingEmployer), status: capacityStatus(remainingEmployer, maxEmployer) },
   ];
 
-  const pieSlices = [
+  const assetBars = [
     { label: 'Cash', value: Math.max(0, cash), color: PIE_COLORS[0] },
     { label: 'Commercial Property', value: Math.max(0, scenarioProperty), color: PIE_COLORS[1] },
     { label: 'Loanbacks', value: Math.max(0, scenarioLoanback), color: PIE_COLORS[2] },
     { label: 'Third-Party Loans', value: Math.max(0, totals.thirdParty), color: PIE_COLORS[3] },
     { label: 'Fund Investments', value: Math.max(0, totals.funds), color: PIE_COLORS[6] },
-    { label: 'Borrowing', value: Math.max(0, Math.abs(scenarioBorrowing)), color: PIE_COLORS[4] },
     { label: 'Employer Investments', value: Math.max(0, scenarioEmployer), color: PIE_COLORS[5] },
-  ].filter(s => s.value > 0.01);
+    { label: 'Borrowing (liability)', value: -Math.max(0, scenarioBorrowing), color: PIE_COLORS[4] },
+  ];
+
+  const maxAbsAsset = Math.max(1, ...assetBars.map(b => Math.abs(b.value)));
 
 
   const handleSave = async () => {
@@ -412,7 +413,31 @@ export default function Dashboard({ scheme, onSchemeUpdate }: DashboardProps) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
           <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-4">Asset Allocation</h2>
-          <PieChart slices={pieSlices} />
+          <div className="space-y-3">
+            {assetBars.map(bar => {
+              const isLiability = bar.value < 0;
+              const widthPct = (Math.abs(bar.value) / maxAbsAsset) * 100;
+              return (
+                <div key={bar.label}>
+                  <div className="flex justify-between text-xs mb-1">
+                    <span className="text-gray-600 font-medium">{bar.label}</span>
+                    <span className={`font-semibold ${isLiability ? 'text-red-600' : 'text-gray-800'}`}>
+                      {isLiability ? '-' : ''}{fmt(Math.abs(bar.value))}
+                    </span>
+                  </div>
+                  <div className="h-3 rounded-full bg-gray-100 overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-700"
+                      style={{ width: `${widthPct}%`, backgroundColor: bar.color }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <p className="text-xs text-gray-400 mt-4">
+            Bars show asset values; Borrowing is shown as a liability (negative).
+          </p>
         </div>
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
           <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-5">HMRC Utilisation</h2>
