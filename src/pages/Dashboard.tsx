@@ -96,12 +96,14 @@ export default function Dashboard({ scheme, onSchemeUpdate }: DashboardProps) {
   }, [scheme.id]);
 
   async function loadActiveScenario() {
-    const { data: sc } = await supabase
+    const { data: scRows } = await supabase
       .from('scenarios')
       .select('*')
       .eq('scheme_id', scheme.id)
       .eq('is_active', true)
-      .maybeSingle();
+      .order('created_at', { ascending: false })
+      .limit(1);
+    const sc = scRows?.[0] ?? null;
     if (!sc) {
       setActiveScenario(null);
       setScenarioActions([]);
