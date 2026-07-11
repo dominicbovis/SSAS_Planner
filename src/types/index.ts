@@ -382,6 +382,23 @@ export interface CashflowSettings {
   updated_at: string;
 }
 
+export interface ChatSession {
+  id: string;
+  scheme_id: string;
+  title: string;
+  scenario_context: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChatMessageRecord {
+  id: string;
+  session_id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  created_at: string;
+}
+
 export interface FundInvestmentRecord {
   id: string;
   scheme_id: string;
