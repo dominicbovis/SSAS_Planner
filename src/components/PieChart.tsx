@@ -27,10 +27,40 @@ export default function PieChart({ slices, title }: PieChartProps) {
   const r = 80;
   const ir = 44;
 
+  const activeSlices = slices.filter(s => s.value > 0);
+
+  // When there's only one slice, render two concentric circles (arc path degenerates at 360°)
+  if (activeSlices.length === 1) {
+    const slice = activeSlices[0];
+    const paths = [{
+      d: `M ${cx} ${cy - r} A ${r} ${r} 0 1 1 ${cx - 0.001} ${cy - r} Z M ${cx} ${cy - ir} A ${ir} ${ir} 0 1 0 ${cx - 0.001} ${cy - ir} Z`,
+      color: slice.color, label: slice.label, value: slice.value, pct: 1,
+    }];
+    return (
+      <div>
+        {title && <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{title}</p>}
+        <div className="flex gap-4 items-start">
+          <svg viewBox="0 0 220 220" className="w-44 shrink-0">
+            <path d={paths[0].d} fill={paths[0].color} fillRule="evenodd" />
+            <text x={cx} y={cy - 6} textAnchor="middle" fill="#374151" style={{ fontSize: 11, fontWeight: 600 }}>Total</text>
+            <text x={cx} y={cy + 12} textAnchor="middle" fill="#374151" style={{ fontSize: 10 }}>£{(total / 1000).toFixed(0)}k</text>
+          </svg>
+          <div className="flex flex-col gap-1 pt-2">
+            {activeSlices.map((s, i) => (
+              <div key={i} className="flex items-center gap-2 text-xs">
+                <div className="w-3 h-3 rounded-sm shrink-0" style={{ background: s.color }} />
+                <span className="text-gray-600 truncate max-w-[120px]">{s.label}</span>
+                <span className="text-gray-800 font-medium ml-auto">£{(s.value / 1000).toFixed(0)}k</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   let cumAngle = 0;
-  const paths = slices
-    .filter(s => s.value > 0)
-    .map(slice => {
+  const paths = activeSlices.map(slice => {
       const pct = slice.value / total;
       const startAngle = cumAngle;
       const endAngle = cumAngle + pct * 360;
