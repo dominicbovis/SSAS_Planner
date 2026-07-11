@@ -162,6 +162,9 @@ export default function Dashboard({ scheme, onSchemeUpdate }: DashboardProps) {
   let scenarioCashDelta = 0;
   let scenarioNavDelta = 0;
   let scenarioPropertyDelta = 0;
+  let scenarioLoanbackDelta = 0;
+  let scenarioBorrowingDelta = 0;
+  let scenarioEmployerDelta = 0;
   if (activeScenarios.length > 0) {
     for (const a of scenarioActions) {
       const amt = Number(a.amount);
@@ -175,11 +178,11 @@ export default function Dashboard({ scheme, onSchemeUpdate }: DashboardProps) {
           scenarioPropertyDelta += assetVal;
           break;
         }
-        case 'loanback': scenarioCashDelta -= amt; break;
-        case 'repay_loanback': scenarioCashDelta += amt; break;
-        case 'borrow': scenarioCashDelta += amt; break;
-        case 'repay_borrowing': scenarioCashDelta -= amt; break;
-        case 'employer_investment': scenarioCashDelta -= amt; break;
+        case 'loanback': scenarioCashDelta -= amt; scenarioLoanbackDelta += amt; break;
+        case 'repay_loanback': scenarioCashDelta += amt; scenarioLoanbackDelta -= amt; break;
+        case 'borrow': scenarioCashDelta += amt; scenarioBorrowingDelta += amt; break;
+        case 'repay_borrowing': scenarioCashDelta -= amt; scenarioBorrowingDelta -= amt; break;
+        case 'employer_investment': scenarioCashDelta -= amt; scenarioEmployerDelta += amt; break;
       }
     }
     for (const t of scenarioTransfers) {
