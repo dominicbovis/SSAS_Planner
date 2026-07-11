@@ -20,7 +20,6 @@ import RefinanceWaterfall from './pages/RefinanceWaterfall';
 import LenderPackBridging from './pages/LenderPackBridging';
 import LenderPackTerm from './pages/LenderPackTerm';
 import NavTracker from './pages/NavTracker';
-import AskClaude from './pages/AskClaude';
 
 export default function App() {
   const [scheme, setScheme] = useState<SsasScheme | null>(null);
@@ -86,7 +85,6 @@ export default function App() {
           {page === 'refinance-waterfall' && <RefinanceWaterfall scheme={scheme} />}
           {page === 'lender-pack-bridging' && <LenderPackBridging scheme={scheme} />}
           {page === 'lender-pack-term' && <LenderPackTerm scheme={scheme} />}
-          {page === 'ask-claude' && <AskClaude scheme={scheme} />}
         </div>
       </main>
     </div>

@@ -16,7 +16,6 @@ import {
   Anchor,
   ClipboardList,
   Scale,
-  Sparkles,
 } from 'lucide-react';
 
 export type Page =
@@ -37,8 +36,7 @@ export type Page =
   | 'lender-pack'
   | 'refinance-waterfall'
   | 'lender-pack-bridging'
-  | 'lender-pack-term'
-  | 'ask-claude';
+  | 'lender-pack-term';
 
 interface NavItem {
   id: Page;
@@ -66,7 +64,6 @@ const items: NavItem[] = [
   { id: 'lender-pack-term', label: 'LP — Term', icon: ClipboardList, group: 'Analysis' },
   { id: 'trustee-report', label: 'Trustee Report', icon: FileText, group: 'Reports' },
   { id: 'multi-period-report', label: 'Multi-Period Report', icon: BarChart2, group: 'Reports' },
-  { id: 'ask-claude', label: 'Ask Claude', icon: Sparkles, group: 'AI Assistant' },
 ];
 
 interface NavigationProps {

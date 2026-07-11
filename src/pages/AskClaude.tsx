@@ -12,6 +12,7 @@ interface Message {
 
 interface Props {
   scheme: SsasScheme;
+  scenarioContext?: string;
 }
 
 const SUGGESTED_QUESTIONS = [
@@ -38,7 +39,7 @@ function buildSchemeContext(scheme: SsasScheme): string {
   ].join('\n');
 }
 
-export default function AskClaude({ scheme }: Props) {
+export default function AskClaude({ scheme, scenarioContext }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -81,7 +82,7 @@ export default function AskClaude({ scheme }: Props) {
           },
           body: JSON.stringify({
             messages: historyForApi,
-            schemeContext: buildSchemeContext(scheme),
+            schemeContext: buildSchemeContext(scheme) + (scenarioContext ? `\n\nACTIVE SCENARIO CONTEXT:\n${scenarioContext}` : ''),
           }),
           signal: abortRef.current.signal,
         }

@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { Plus, Trash2, Check, ChevronDown, ChevronUp, X, ArrowDownCircle, ArrowUpCircle, Building2, TrendingUp, AlertTriangle, Lightbulb, Zap, Pencil, CalendarClock } from 'lucide-react';
+import { Plus, Trash2, Check, ChevronDown, ChevronUp, X, ArrowDownCircle, ArrowUpCircle, Building2, TrendingUp, AlertTriangle, Lightbulb, Zap, Pencil, CalendarClock, Sparkles } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { SsasScheme, ScenarioRecord, ScenarioAction, ScenarioActionType, PendingTransfer } from '../types';
 import GaugeChart from '../components/GaugeChart';
 import BarChart from '../components/BarChart';
 import CashWaterfallChart, { WaterfallStep } from '../components/CashWaterfallChart';
+import AskClaude from './AskClaude';
 import { fmt, fmtFull } from '../lib/format';
 
 // ─── Action metadata ────────────────────────────────────────────────────────
@@ -723,6 +724,33 @@ export default function Scenarios({ scheme }: Props) {
     ? activeScenarios[0].scenario_name
     : `${activeScenarios.length} Scenarios Stacked`;
 
+  const scenarioContext = activeScenarios.length === 0
+    ? 'No scenarios are currently active.'
+    : [
+        `Active scenarios (${activeScenarios.length}):`,
+        ...activeScenarios.map((sc) => {
+          const acts = actions[sc.id] ?? [];
+          const d = deriveAdjustments(acts, nav, transfers[sc.id] ?? []);
+          const lines = [
+            `  - ${sc.scenario_name}${sc.description ? ` — ${sc.description}` : ''}`,
+            `    NAV adjustment: ${d.navAdjPct >= 0 ? '+' : ''}${d.navAdjPct.toFixed(1)}% (${fmt(nav + d.navDelta)})`,
+            `    Cash delta: ${d.cashDelta >= 0 ? '+' : ''}${fmt(d.cashDelta)} → ${fmt(cash + d.cashDelta)}`,
+            `    Loanbacks: ${fmt(totals.loanbacks + d.loanbackDelta)} (limit ${fmt(0.5 * (nav + d.navDelta))})`,
+            `    Borrowing: ${fmt(totals.borrowing + d.borrowingDelta)} (limit ${fmt(0.5 * (nav + d.navDelta))})`,
+            `    Employer investments: ${fmt(totals.employer + d.employerDelta)} (limit ${fmt(0.20 * (nav + d.navDelta))})`,
+          ];
+          if (acts.length > 0) {
+            lines.push(`    Actions (${acts.length}):`);
+            for (const a of acts) {
+              lines.push(`      • ${a.action_type}: ${fmt(Number(a.amount) || 0)}${a.asset_name ? ` — ${a.asset_name}` : ''}${a.expected_date ? ` (expected ${fmtFull(a.expected_date)})` : ''}`);
+            }
+          }
+          return lines.join('\n');
+        }),
+        '',
+        `Stacked position: NAV ${fmt(stackedNav)}, Cash ${fmt(stackedCash)}, Loanbacks ${fmt(stackedLoanbacks)}/${fmt(sMaxLoanback)}, Borrowing ${fmt(stackedBorrowing)}/${fmt(sMaxBorrowing)}, Employer ${fmt(stackedEmployer)}/${fmt(sMaxEmployer)}.`,
+      ].join('\n');
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -1300,6 +1328,17 @@ export default function Scenarios({ scheme }: Props) {
           Activate one or more scenarios above to view stacked gauge outputs and capacity analysis.
         </div>
       )}
+
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mt-6">
+        <div className="flex items-center gap-2 mb-1">
+          <Sparkles className="w-5 h-5 text-blue-500" />
+          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Ask Claude</h2>
+        </div>
+        <p className="text-xs text-gray-500 mb-4">
+          Ask questions about the active scenarios. Claude receives the scenario names, descriptions, actions, and projected capacity figures.
+        </p>
+        <AskClaude scheme={scheme} scenarioContext={scenarioContext} />
+      </div>
     </div>
   );
 }
