@@ -337,7 +337,12 @@ export default function Dashboard({ scheme, onSchemeUpdate }: DashboardProps) {
         {/* Cash balance total */}
         <div className="flex items-center justify-end gap-2 mt-4 pt-4 border-t border-gray-100">
           <span className="text-xs text-gray-500 font-medium">Total Cash Balance:</span>
-          <span className="text-sm font-bold text-gray-900">{fmtFull(Number(schemeVal('cash_balance')))}</span>
+          <span className="text-sm font-bold text-gray-900">{fmtFull(cash)}</span>
+          {includeScenario && scenarioCashDelta !== 0 && (
+            <span className={`text-xs font-medium ${scenarioCashDelta < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+              ({scenarioCashDelta > 0 ? '+' : ''}{fmtFull(scenarioCashDelta)} scenario)
+            </span>
+          )}
         </div>
 
         {/* Active scenario toggle */}
