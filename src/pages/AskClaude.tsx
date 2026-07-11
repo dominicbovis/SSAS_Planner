@@ -88,8 +88,10 @@ export default function AskClaude({ scheme }: Props) {
       );
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-        throw new Error(err.error ?? `Request failed (${res.status})`);
+        const body = await res.text().catch(() => '');
+        let msg = `HTTP ${res.status}`;
+        try { msg = JSON.parse(body)?.error ?? msg; } catch { /* keep default */ }
+        throw new Error(msg);
       }
 
       const reader = res.body!.getReader();

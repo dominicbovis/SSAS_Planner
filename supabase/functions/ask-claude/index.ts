@@ -64,7 +64,7 @@ Answer questions clearly and practically. When discussing limits or compliance i
   }));
 
   const anthropicReq = {
-    model: "claude-sonnet-4-20250514",
+    model: "claude-sonnet-4-5-20250929",
     max_tokens: 2048,
     system: systemPrompt,
     messages: anthropicMessages,
