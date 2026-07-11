@@ -85,7 +85,7 @@ export default function Dashboard({ scheme, onSchemeUpdate }: DashboardProps) {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [perEmployerBreach, setPerEmployerBreach] = useState(false);
-  const [activeScenario, setActiveScenario] = useState<ScenarioRecord | null>(null);
+  const [activeScenarios, setActiveScenarios] = useState<ScenarioRecord[]>([]);
   const [scenarioActions, setScenarioActions] = useState<ScenarioAction[]>([]);
   const [scenarioTransfers, setScenarioTransfers] = useState<PendingTransfer[]>([]);
   const [includeScenario, setIncludeScenario] = useState(false);
@@ -101,19 +101,19 @@ export default function Dashboard({ scheme, onSchemeUpdate }: DashboardProps) {
       .select('*')
       .eq('scheme_id', scheme.id)
       .eq('is_active', true)
-      .order('created_at', { ascending: false })
-      .limit(1);
-    const sc = scRows?.[0] ?? null;
-    if (!sc) {
-      setActiveScenario(null);
+      .order('created_at', { ascending: false });
+    const scenarios = (scRows ?? []) as ScenarioRecord[];
+    if (scenarios.length === 0) {
+      setActiveScenarios([]);
       setScenarioActions([]);
       setScenarioTransfers([]);
       return;
     }
-    setActiveScenario(sc as ScenarioRecord);
+    setActiveScenarios(scenarios);
+    const ids = scenarios.map(s => s.id);
     const [acts, trans] = await Promise.all([
-      supabase.from('scenario_actions').select('*').eq('scenario_id', sc.id).order('created_at'),
-      supabase.from('pending_transfers').select('*').eq('scenario_id', sc.id).order('expected_date'),
+      supabase.from('scenario_actions').select('*').in('scenario_id', ids).order('created_at'),
+      supabase.from('pending_transfers').select('*').in('scenario_id', ids).order('expected_date'),
     ]);
     setScenarioActions((acts.data ?? []) as ScenarioAction[]);
     setScenarioTransfers((trans.data ?? []) as PendingTransfer[]);
@@ -161,7 +161,7 @@ export default function Dashboard({ scheme, onSchemeUpdate }: DashboardProps) {
   // Compute scenario adjustments (cash + NAV delta from actions and pending transfers)
   let scenarioCashDelta = 0;
   let scenarioNavDelta = 0;
-  if (activeScenario) {
+  if (activeScenarios.length > 0) {
     for (const a of scenarioActions) {
       const amt = Number(a.amount);
       switch (a.action_type) {
@@ -336,13 +336,19 @@ export default function Dashboard({ scheme, onSchemeUpdate }: DashboardProps) {
         </div>
 
         {/* Active scenario toggle */}
-        {activeScenario && (
+        {activeScenarios.length > 0 && (
           <div className="mt-4 p-3 rounded-lg border border-amber-200 bg-amber-50/60">
             <div className="flex items-center justify-between gap-3">
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold text-amber-800 uppercase tracking-wide">Active Scenario</span>
-                  <span className="text-sm font-medium text-gray-800 truncate">{activeScenario.scenario_name}</span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-semibold text-amber-800 uppercase tracking-wide">
+                    {activeScenarios.length === 1 ? 'Active Scenario' : `${activeScenarios.length} Active Scenarios`}
+                  </span>
+                  {activeScenarios.map(s => (
+                    <span key={s.id} className="text-xs font-medium text-gray-800 bg-white border border-amber-200 rounded px-1.5 py-0.5 truncate max-w-[160px]">
+                      {s.scenario_name}
+                    </span>
+                  ))}
                 </div>
                 <p className="text-xs text-amber-700 mt-0.5">
                   {includeScenario
@@ -353,7 +359,7 @@ export default function Dashboard({ scheme, onSchemeUpdate }: DashboardProps) {
               <button
                 onClick={() => setIncludeScenario(prev => !prev)}
                 className="flex items-center gap-1.5 shrink-0"
-                title={includeScenario ? 'Exclude scenario from calculations' : 'Include scenario in calculations'}
+                title={includeScenario ? 'Exclude scenarios from calculations' : 'Include scenarios in calculations'}
               >
                 {includeScenario
                   ? <ToggleRight size={36} className="text-amber-600" />
