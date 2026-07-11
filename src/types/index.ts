@@ -231,6 +231,9 @@ export interface ScenarioAction {
   label: string;
   counterparty: string;
   amount: number;
+  action_date: string | null;
+  asset_value: number | null;
+  funding_source: string;
   notes: string;
   created_at: string;
 }

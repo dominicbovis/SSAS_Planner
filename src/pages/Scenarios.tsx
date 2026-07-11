@@ -22,8 +22,8 @@ const ACTION_META: Record<ScenarioActionType, ActionMeta> = {
     label: 'Property Purchase',
     icon: <Building2 size={14} />,
     color: 'bg-blue-50 text-blue-700 border-blue-200',
-    description: 'Buy commercial property into the scheme. Reduces cash; NAV stays neutral (cash swaps for property).',
-    affects: ['↓ Cash'],
+    description: 'Buy commercial property into the scheme. Cash reduces by purchase price; NAV increases by RICS valuation.',
+    affects: ['↑ Property (NAV)', '↓ Cash'],
   },
   loanback: {
     label: 'New Loanback',
@@ -82,9 +82,10 @@ function actionToAdjustments(action: ScenarioAction): {
   navDelta: number; loanbackDelta: number; borrowingDelta: number; employerDelta: number; cashDelta: number;
 } {
   const amt = Number(action.amount);
+  const assetVal = action.asset_value != null ? Number(action.asset_value) : amt;
   switch (action.action_type) {
     case 'property_purchase':
-      return { navDelta: 0, loanbackDelta: 0, borrowingDelta: 0, employerDelta: 0, cashDelta: -amt };
+      return { navDelta: assetVal, loanbackDelta: 0, borrowingDelta: 0, employerDelta: 0, cashDelta: -amt };
     case 'loanback':
       return { navDelta: 0, loanbackDelta: amt, borrowingDelta: 0, employerDelta: 0, cashDelta: -amt };
     case 'repay_loanback':
@@ -347,6 +348,9 @@ interface ActionFormState {
   label: string;
   counterparty: string;
   amount: string;
+  action_date: string;
+  asset_value: string;
+  funding_source: string;
   notes: string;
 }
 
@@ -355,6 +359,9 @@ const EMPTY_FORM: ActionFormState = {
   label: '',
   counterparty: '',
   amount: '',
+  action_date: '',
+  asset_value: '',
+  funding_source: 'Cash',
   notes: '',
 };
 
@@ -392,7 +399,7 @@ function ActionForm({ onSave, onCancel }: { onSave: (f: ActionFormState) => void
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1">Description <span className="text-red-500">*</span></label>
           <input type="text" value={form.label} onChange={e => set('label', e.target.value)}
-            placeholder="e.g. Purchase building from RHHL"
+            placeholder="e.g. Purchase York Buildings"
             className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 bg-white" />
         </div>
         <div>
@@ -406,11 +413,40 @@ function ActionForm({ onSave, onCancel }: { onSave: (f: ActionFormState) => void
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none">£</span>
             <input type="text" inputMode="decimal" value={form.amount} onChange={e => set('amount', e.target.value)}
-              placeholder="200000"
+              placeholder="500000"
               className="w-full pl-7 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 bg-white" />
           </div>
+          <p className="text-[10px] text-gray-400 mt-0.5">Cash outflow / purchase price</p>
         </div>
         <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Action Date</label>
+          <input type="date" value={form.action_date} onChange={e => set('action_date', e.target.value)}
+            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 bg-white" />
+        </div>
+        {form.action_type === 'property_purchase' && (
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Asset Value / RICS Valuation (£)</label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none">£</span>
+              <input type="text" inputMode="decimal" value={form.asset_value} onChange={e => set('asset_value', e.target.value)}
+                placeholder="500000"
+                className="w-full pl-7 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 bg-white" />
+            </div>
+            <p className="text-[10px] text-gray-400 mt-0.5">RICS valuation — drives NAV increase</p>
+          </div>
+        )}
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Funding Source</label>
+          <select value={form.funding_source} onChange={e => set('funding_source', e.target.value)}
+            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 bg-white">
+            <option value="Cash">Cash</option>
+            <option value="Borrowing">Borrowing</option>
+            <option value="Loanback Repayment">Loanback Repayment</option>
+            <option value="Transfer In">Transfer In</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div className={form.action_type === 'property_purchase' ? 'sm:col-span-1' : 'sm:col-span-2'}>
           <label className="block text-xs font-medium text-gray-500 mb-1">Notes</label>
           <input type="text" value={form.notes} onChange={e => set('notes', e.target.value)}
             placeholder="Optional additional context"
@@ -452,7 +488,7 @@ export default function Scenarios({ scheme }: Props) {
   const [showDescFor, setShowDescFor] = useState<Record<string, boolean>>({});
   const [showFormFor, setShowFormFor] = useState<string | null>(null);
   const [editingActionId, setEditingActionId] = useState<string | null>(null);
-  const [editDraft, setEditDraft] = useState<{ label: string; counterparty: string; amount: string; notes: string }>({ label: '', counterparty: '', amount: '', notes: '' });
+  const [editDraft, setEditDraft] = useState<{ label: string; counterparty: string; amount: string; action_date: string; asset_value: string; funding_source: string; notes: string }>({ label: '', counterparty: '', amount: '', action_date: '', asset_value: '', funding_source: 'Cash', notes: '' });
   const [transfers, setTransfers] = useState<Record<string, PendingTransfer[]>>({});
   const [showTransferFormFor, setShowTransferFormFor] = useState<string | null>(null);
   const [transferDraft, setTransferDraft] = useState<{ description: string; source: string; amount: string; expected_date: string }>({ description: '', source: '', amount: '', expected_date: '' });
@@ -554,7 +590,7 @@ export default function Scenarios({ scheme }: Props) {
     await syncAdjustments(scenarioId, actions[scenarioId] ?? [], updated);
   }
 
-  async function persistAndSync(scenarioId: string, form: { action_type: ScenarioActionType; label: string; counterparty: string; amount: number; notes: string }) {
+  async function persistAndSync(scenarioId: string, form: { action_type: ScenarioActionType; label: string; counterparty: string; amount: number; action_date: string | null; asset_value: number | null; funding_source: string; notes: string }) {
     const { data } = await supabase.from('scenario_actions').insert({
       scenario_id: scenarioId,
       scheme_id: scheme.id,
@@ -570,7 +606,14 @@ export default function Scenarios({ scheme }: Props) {
   async function addAction(scenarioId: string, form: ActionFormState) {
     const amt = parseFloat(form.amount.replace(/,/g, ''));
     if (isNaN(amt) || amt <= 0) return;
-    await persistAndSync(scenarioId, { action_type: form.action_type, label: form.label, counterparty: form.counterparty, amount: amt, notes: form.notes });
+    const assetVal = form.asset_value ? parseFloat(form.asset_value.replace(/,/g, '')) : null;
+    await persistAndSync(scenarioId, {
+      action_type: form.action_type, label: form.label, counterparty: form.counterparty, amount: amt,
+      action_date: form.action_date || null,
+      asset_value: isNaN(assetVal as number) ? null : assetVal,
+      funding_source: form.funding_source,
+      notes: form.notes,
+    });
     setShowFormFor(null);
   }
 
@@ -580,6 +623,9 @@ export default function Scenarios({ scheme }: Props) {
       label: fix.actionLabel,
       counterparty: fix.counterparty,
       amount: fix.amount,
+      action_date: null,
+      asset_value: null,
+      funding_source: 'Cash',
       notes: fix.notes,
     });
   }
@@ -593,20 +639,32 @@ export default function Scenarios({ scheme }: Props) {
 
   function startEdit(action: ScenarioAction) {
     setEditingActionId(action.id);
-    setEditDraft({ label: action.label, counterparty: action.counterparty, amount: String(action.amount), notes: action.notes });
+    setEditDraft({
+      label: action.label,
+      counterparty: action.counterparty,
+      amount: String(action.amount),
+      action_date: action.action_date ?? '',
+      asset_value: action.asset_value != null ? String(action.asset_value) : '',
+      funding_source: action.funding_source ?? 'Cash',
+      notes: action.notes,
+    });
   }
 
   async function commitEdit(scenarioId: string, actionId: string) {
     const amt = parseFloat(editDraft.amount.replace(/,/g, ''));
     if (isNaN(amt) || amt <= 0) { setEditingActionId(null); return; }
+    const assetVal = editDraft.asset_value ? parseFloat(editDraft.asset_value.replace(/,/g, '')) : null;
     await supabase.from('scenario_actions').update({
       label: editDraft.label,
       counterparty: editDraft.counterparty,
       amount: amt,
+      action_date: editDraft.action_date || null,
+      asset_value: isNaN(assetVal as number) ? null : assetVal,
+      funding_source: editDraft.funding_source,
       notes: editDraft.notes,
     }).eq('id', actionId);
     const updated = (actions[scenarioId] ?? []).map(a =>
-      a.id === actionId ? { ...a, label: editDraft.label, counterparty: editDraft.counterparty, amount: amt, notes: editDraft.notes } : a
+      a.id === actionId ? { ...a, label: editDraft.label, counterparty: editDraft.counterparty, amount: amt, action_date: editDraft.action_date || null, asset_value: isNaN(assetVal as number) ? null : assetVal, funding_source: editDraft.funding_source, notes: editDraft.notes } : a
     );
     setActions(prev => ({ ...prev, [scenarioId]: updated }));
     await syncAdjustments(scenarioId, updated);
@@ -824,6 +882,44 @@ export default function Scenarios({ scheme }: Props) {
                               </div>
                             </div>
                             <div>
+                              <label className="block text-xs font-medium opacity-70 mb-0.5">Action Date</label>
+                              <input
+                                type="date"
+                                value={editDraft.action_date}
+                                onChange={e => setEditDraft(d => ({ ...d, action_date: e.target.value }))}
+                                className="w-full text-xs border border-current/20 rounded-md px-2 py-1.5 bg-white/80 focus:outline-none focus:ring-1 focus:ring-current"
+                              />
+                            </div>
+                            {a.action_type === 'property_purchase' && (
+                              <div>
+                                <label className="block text-xs font-medium opacity-70 mb-0.5">RICS Valuation (£)</label>
+                                <div className="relative">
+                                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs opacity-60 pointer-events-none">£</span>
+                                  <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={editDraft.asset_value}
+                                    onChange={e => setEditDraft(d => ({ ...d, asset_value: e.target.value }))}
+                                    className="w-full pl-5 text-xs border border-current/20 rounded-md px-2 py-1.5 bg-white/80 focus:outline-none focus:ring-1 focus:ring-current"
+                                  />
+                                </div>
+                              </div>
+                            )}
+                            <div>
+                              <label className="block text-xs font-medium opacity-70 mb-0.5">Funding Source</label>
+                              <select
+                                value={editDraft.funding_source}
+                                onChange={e => setEditDraft(d => ({ ...d, funding_source: e.target.value }))}
+                                className="w-full text-xs border border-current/20 rounded-md px-2 py-1.5 bg-white/80 focus:outline-none focus:ring-1 focus:ring-current"
+                              >
+                                <option value="Cash">Cash</option>
+                                <option value="Borrowing">Borrowing</option>
+                                <option value="Loanback Repayment">Loanback Repayment</option>
+                                <option value="Transfer In">Transfer In</option>
+                                <option value="Other">Other</option>
+                              </select>
+                            </div>
+                            <div className="col-span-2">
                               <label className="block text-xs font-medium opacity-70 mb-0.5">Notes</label>
                               <input
                                 type="text"
@@ -859,14 +955,28 @@ export default function Scenarios({ scheme }: Props) {
                           <div className="flex items-baseline gap-2 flex-wrap">
                             <span className="text-xs font-semibold">{meta.label}</span>
                             {a.counterparty && <span className="text-xs opacity-70">— {a.counterparty}</span>}
+                            {a.action_date && <span className="text-xs opacity-60">· {a.action_date}</span>}
                           </div>
                           <p className="text-xs mt-0.5">{a.label}</p>
                           {a.notes && <p className="text-xs opacity-60 mt-0.5">{a.notes}</p>}
                           <div className="flex flex-wrap gap-3 mt-1.5 text-xs font-medium">
                             <span>Amount: {fmtFull(Number(a.amount))}</span>
+                            {a.action_type === 'property_purchase' && a.asset_value != null && (
+                              <span className="text-blue-700">
+                                RICS Valuation: {fmtFull(Number(a.asset_value))}
+                              </span>
+                            )}
+                            {a.funding_source && a.funding_source !== 'Cash' && (
+                              <span className="text-gray-600">Funded by: {a.funding_source}</span>
+                            )}
                             {adjs.cashDelta !== 0 && (
                               <span className={adjs.cashDelta > 0 ? 'text-emerald-700' : 'text-red-700'}>
                                 Cash: {adjs.cashDelta > 0 ? '+' : ''}{fmtFull(adjs.cashDelta)}
+                              </span>
+                            )}
+                            {adjs.navDelta !== 0 && (
+                              <span className={adjs.navDelta > 0 ? 'text-emerald-700' : 'text-red-700'}>
+                                NAV: {adjs.navDelta > 0 ? '+' : ''}{fmtFull(adjs.navDelta)}
                               </span>
                             )}
                             {adjs.loanbackDelta !== 0 && <span>Loanbacks: {adjs.loanbackDelta > 0 ? '+' : ''}{fmtFull(adjs.loanbackDelta)}</span>}

@@ -167,7 +167,12 @@ export default function Dashboard({ scheme, onSchemeUpdate }: DashboardProps) {
       switch (a.action_type) {
         case 'cash_in': scenarioCashDelta += amt; scenarioNavDelta += amt; break;
         case 'cash_out': scenarioCashDelta -= amt; scenarioNavDelta -= amt; break;
-        case 'property_purchase': scenarioNavDelta += amt; scenarioCashDelta -= amt; break;
+        case 'property_purchase': {
+          const assetVal = a.asset_value != null ? Number(a.asset_value) : amt;
+          scenarioNavDelta += assetVal;
+          scenarioCashDelta -= amt;
+          break;
+        }
         case 'loanback': scenarioCashDelta -= amt; break;
         case 'repay_loanback': scenarioCashDelta += amt; break;
         case 'borrow': scenarioCashDelta += amt; break;
