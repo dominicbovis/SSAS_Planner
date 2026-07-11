@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
-import { Save, RefreshCw } from 'lucide-react';
+import { Save, RefreshCw, ToggleLeft, ToggleRight } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { SsasScheme } from '../types';
+import { SsasScheme, ScenarioRecord, ScenarioAction, PendingTransfer } from '../types';
 import GaugeChart from '../components/GaugeChart';
 import PieChart from '../components/PieChart';
 import StatusBadge from '../components/StatusBadge';
@@ -85,10 +85,37 @@ export default function Dashboard({ scheme, onSchemeUpdate }: DashboardProps) {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [perEmployerBreach, setPerEmployerBreach] = useState(false);
+  const [activeScenario, setActiveScenario] = useState<ScenarioRecord | null>(null);
+  const [scenarioActions, setScenarioActions] = useState<ScenarioAction[]>([]);
+  const [scenarioTransfers, setScenarioTransfers] = useState<PendingTransfer[]>([]);
+  const [includeScenario, setIncludeScenario] = useState(false);
 
   useEffect(() => {
     loadTotals();
+    loadActiveScenario();
   }, [scheme.id]);
+
+  async function loadActiveScenario() {
+    const { data: sc } = await supabase
+      .from('scenarios')
+      .select('*')
+      .eq('scheme_id', scheme.id)
+      .eq('is_active', true)
+      .maybeSingle();
+    if (!sc) {
+      setActiveScenario(null);
+      setScenarioActions([]);
+      setScenarioTransfers([]);
+      return;
+    }
+    setActiveScenario(sc as ScenarioRecord);
+    const [acts, trans] = await Promise.all([
+      supabase.from('scenario_actions').select('*').eq('scenario_id', sc.id).order('created_at'),
+      supabase.from('pending_transfers').select('*').eq('scenario_id', sc.id).order('expected_date'),
+    ]);
+    setScenarioActions((acts.data ?? []) as ScenarioAction[]);
+    setScenarioTransfers((trans.data ?? []) as PendingTransfer[]);
+  }
 
   async function loadTotals() {
     setLoading(true);
@@ -127,11 +154,38 @@ export default function Dashboard({ scheme, onSchemeUpdate }: DashboardProps) {
   }
 
   const nav = totals.computedNav;
-  const cash = Number(scheme.metro_bank_balance) + Number(scheme.cater_allen_balance) + Number(scheme.utb_balance);
+  const baseCash = Number(scheme.metro_bank_balance) + Number(scheme.cater_allen_balance) + Number(scheme.utb_balance);
 
-  const maxLoanback = 0.5 * nav;
-  const maxBorrowing = 0.5 * nav;
-  const maxEmployer = 0.20 * nav;
+  // Compute scenario adjustments (cash + NAV delta from actions and pending transfers)
+  let scenarioCashDelta = 0;
+  let scenarioNavDelta = 0;
+  if (activeScenario) {
+    for (const a of scenarioActions) {
+      const amt = Number(a.amount);
+      switch (a.action_type) {
+        case 'cash_in': scenarioCashDelta += amt; scenarioNavDelta += amt; break;
+        case 'cash_out': scenarioCashDelta -= amt; scenarioNavDelta -= amt; break;
+        case 'property_purchase': scenarioNavDelta += amt; scenarioCashDelta -= amt; break;
+        case 'loanback': scenarioCashDelta -= amt; break;
+        case 'repay_loanback': scenarioCashDelta += amt; break;
+        case 'borrow': scenarioCashDelta += amt; break;
+        case 'repay_borrowing': scenarioCashDelta -= amt; break;
+        case 'employer_investment': scenarioCashDelta -= amt; break;
+      }
+    }
+    for (const t of scenarioTransfers) {
+      const amt = Number(t.amount);
+      scenarioCashDelta += amt;
+      scenarioNavDelta += amt;
+    }
+  }
+
+  const cash = includeScenario ? baseCash + scenarioCashDelta : baseCash;
+  const displayNav = includeScenario ? nav + scenarioNavDelta : nav;
+
+  const maxLoanback = 0.5 * displayNav;
+  const maxBorrowing = 0.5 * displayNav;
+  const maxEmployer = 0.20 * displayNav;
 
   const remainingLoanback = maxLoanback - totals.loanbacks;
   const remainingBorrowing = maxBorrowing - totals.borrowing;
@@ -234,7 +288,7 @@ export default function Dashboard({ scheme, onSchemeUpdate }: DashboardProps) {
           <div className="space-y-1">
             <label className="text-xs text-gray-500 font-medium">Net Asset Value</label>
             <div className="w-full text-sm border border-gray-100 bg-gray-50 rounded-lg px-3 py-2 font-semibold text-gray-900 select-none">
-              {loading ? '—' : fmtFull(nav)}
+              {loading ? '—' : fmtFull(displayNav)}
             </div>
             <p className="text-[10px] text-gray-400 leading-tight">Auto-calculated from NAV Tracker</p>
           </div>
@@ -278,6 +332,37 @@ export default function Dashboard({ scheme, onSchemeUpdate }: DashboardProps) {
           <span className="text-xs text-gray-500 font-medium">Total Cash Balance:</span>
           <span className="text-sm font-bold text-gray-900">{fmtFull(Number(schemeVal('cash_balance')))}</span>
         </div>
+
+        {/* Active scenario toggle */}
+        {activeScenario && (
+          <div className="mt-4 p-3 rounded-lg border border-amber-200 bg-amber-50/60">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-amber-800 uppercase tracking-wide">Active Scenario</span>
+                  <span className="text-sm font-medium text-gray-800 truncate">{activeScenario.scenario_name}</span>
+                </div>
+                <p className="text-xs text-amber-700 mt-0.5">
+                  {includeScenario
+                    ? `Included in calculations: cash ${scenarioCashDelta >= 0 ? '+' : ''}${fmtFull(scenarioCashDelta)}, NAV ${scenarioNavDelta >= 0 ? '+' : ''}${fmtFull(scenarioNavDelta)}`
+                    : 'Excluded from calculations. Toggle to include scenario adjustments.'}
+                </p>
+              </div>
+              <button
+                onClick={() => setIncludeScenario(prev => !prev)}
+                className="flex items-center gap-1.5 shrink-0"
+                title={includeScenario ? 'Exclude scenario from calculations' : 'Include scenario in calculations'}
+              >
+                {includeScenario
+                  ? <ToggleRight size={36} className="text-amber-600" />
+                  : <ToggleLeft size={36} className="text-gray-400" />}
+                <span className={`text-xs font-semibold ${includeScenario ? 'text-amber-700' : 'text-gray-500'}`}>
+                  {includeScenario ? 'ON' : 'OFF'}
+                </span>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Read-only totals */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-5 border-t border-gray-100">
@@ -372,7 +457,7 @@ export default function Dashboard({ scheme, onSchemeUpdate }: DashboardProps) {
             <StatusBadge status={empStatus} />
           </div>
           <dl className="space-y-2">
-            <div className="flex justify-between text-sm"><dt className="text-gray-500">Per-employer limit (5%)</dt><dd className="font-semibold text-gray-800">{fmt(0.05 * nav)}</dd></div>
+            <div className="flex justify-between text-sm"><dt className="text-gray-500">Per-employer limit (5%)</dt><dd className="font-semibold text-gray-800">{fmt(0.05 * displayNav)}</dd></div>
             <div className="flex justify-between text-sm"><dt className="text-gray-500">Aggregate limit (20%)</dt><dd className="font-semibold text-gray-800">{fmt(maxEmployer)}</dd></div>
             <div className="flex justify-between text-sm"><dt className="text-gray-500">Aggregate used</dt><dd className="font-semibold text-gray-800">{fmt(totals.employer)}</dd></div>
             <div className="flex justify-between text-sm pt-2 border-t border-gray-100"><dt className="text-gray-500 font-medium">Aggregate remaining</dt><dd className={`font-bold ${remainingEmployer < 0 ? 'text-red-600' : 'text-emerald-600'}`}>{fmt(remainingEmployer)}</dd></div>

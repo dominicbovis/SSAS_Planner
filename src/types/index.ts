@@ -235,6 +235,17 @@ export interface ScenarioAction {
   created_at: string;
 }
 
+export interface PendingTransfer {
+  id: string;
+  scenario_id: string;
+  scheme_id: string;
+  description: string;
+  source: string;
+  amount: number;
+  expected_date: string | null;
+  created_at: string;
+}
+
 export interface ScenarioRecord {
   id: string;
   scheme_id: string;

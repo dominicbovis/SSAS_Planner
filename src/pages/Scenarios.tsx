@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { Plus, Trash2, Check, ChevronDown, ChevronUp, X, ArrowDownCircle, ArrowUpCircle, Building2, TrendingUp, AlertTriangle, Lightbulb, Zap, Pencil } from 'lucide-react';
+import { Plus, Trash2, Check, ChevronDown, ChevronUp, X, ArrowDownCircle, ArrowUpCircle, Building2, TrendingUp, AlertTriangle, Lightbulb, Zap, Pencil, CalendarClock } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { SsasScheme, ScenarioRecord, ScenarioAction, ScenarioActionType } from '../types';
+import { SsasScheme, ScenarioRecord, ScenarioAction, ScenarioActionType, PendingTransfer } from '../types';
 import GaugeChart from '../components/GaugeChart';
 import BarChart from '../components/BarChart';
 import CashWaterfallChart, { WaterfallStep } from '../components/CashWaterfallChart';
@@ -104,7 +104,7 @@ function actionToAdjustments(action: ScenarioAction): {
   }
 }
 
-function deriveAdjustments(actions: ScenarioAction[], baseNav: number) {
+function deriveAdjustments(actions: ScenarioAction[], baseNav: number, transfers: PendingTransfer[] = []) {
   let navDelta = 0, loanbackDelta = 0, borrowingDelta = 0, employerDelta = 0, cashDelta = 0;
   for (const a of actions) {
     const d = actionToAdjustments(a);
@@ -113,6 +113,11 @@ function deriveAdjustments(actions: ScenarioAction[], baseNav: number) {
     borrowingDelta += d.borrowingDelta;
     employerDelta += d.employerDelta;
     cashDelta += d.cashDelta;
+  }
+  for (const t of transfers) {
+    const amt = Number(t.amount);
+    cashDelta += amt;
+    navDelta += amt;
   }
   const navAdjPct = baseNav > 0 ? (navDelta / baseNav) * 100 : 0;
   return { navDelta, navAdjPct, loanbackDelta, borrowingDelta, employerDelta, cashDelta };
@@ -448,6 +453,9 @@ export default function Scenarios({ scheme }: Props) {
   const [showFormFor, setShowFormFor] = useState<string | null>(null);
   const [editingActionId, setEditingActionId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<{ label: string; counterparty: string; amount: string; notes: string }>({ label: '', counterparty: '', amount: '', notes: '' });
+  const [transfers, setTransfers] = useState<Record<string, PendingTransfer[]>>({});
+  const [showTransferFormFor, setShowTransferFormFor] = useState<string | null>(null);
+  const [transferDraft, setTransferDraft] = useState<{ description: string; source: string; amount: string; expected_date: string }>({ description: '', source: '', amount: '', expected_date: '' });
 
   const nav = Number(scheme.net_asset_value);
   const cash = Number(scheme.cash_balance);
@@ -456,12 +464,13 @@ export default function Scenarios({ scheme }: Props) {
   const activeScenarios = scenarios.filter(s => s.is_active);
 
   const load = useCallback(async () => {
-    const [{ data: sc }, lb, borrow, emp, { data: acts }] = await Promise.all([
+    const [{ data: sc }, lb, borrow, emp, { data: acts }, { data: trans }] = await Promise.all([
       supabase.from('scenarios').select('*').eq('scheme_id', scheme.id).order('created_at'),
       supabase.from('loanback_register').select('outstanding_balance').eq('scheme_id', scheme.id),
       supabase.from('borrowing_register').select('outstanding_balance').eq('scheme_id', scheme.id),
       supabase.from('employer_related_investments').select('amount').eq('scheme_id', scheme.id),
       supabase.from('scenario_actions').select('*').eq('scheme_id', scheme.id).order('created_at'),
+      supabase.from('pending_transfers').select('*').eq('scheme_id', scheme.id).order('expected_date'),
     ]);
     setScenarios(sc ?? []);
     setTotals({
@@ -475,6 +484,12 @@ export default function Scenarios({ scheme }: Props) {
       byScenario[a.scenario_id].push(a);
     }
     setActions(byScenario);
+    const transfersByScenario: Record<string, PendingTransfer[]> = {};
+    for (const t of (trans ?? [])) {
+      if (!transfersByScenario[t.scenario_id]) transfersByScenario[t.scenario_id] = [];
+      transfersByScenario[t.scenario_id].push(t);
+    }
+    setTransfers(transfersByScenario);
   }, [scheme.id]);
 
   useEffect(() => { load(); }, [load]);
@@ -503,14 +518,40 @@ export default function Scenarios({ scheme }: Props) {
     setScenarios(s => s.map(sc => sc.id === id ? { ...sc, description } : sc));
   }
 
-  async function syncAdjustments(scenarioId: string, updatedActions: ScenarioAction[]) {
-    const adj = deriveAdjustments(updatedActions, nav);
+  async function syncAdjustments(scenarioId: string, updatedActions: ScenarioAction[], updatedTransfers?: PendingTransfer[]) {
+    const adj = deriveAdjustments(updatedActions, nav, updatedTransfers ?? transfers[scenarioId] ?? []);
     await supabase.from('scenarios').update({
       nav_adjustment_pct: adj.navAdjPct,
       loanback_adjustment: adj.loanbackDelta,
       borrowing_adjustment: adj.borrowingDelta,
       employer_investment_adjustment: adj.employerDelta,
     }).eq('id', scenarioId);
+  }
+
+  async function addTransfer(scenarioId: string) {
+    const amt = parseFloat(transferDraft.amount.replace(/,/g, ''));
+    if (isNaN(amt) || amt <= 0) return;
+    const { data } = await supabase.from('pending_transfers').insert({
+      scenario_id: scenarioId,
+      scheme_id: scheme.id,
+      description: transferDraft.description,
+      source: transferDraft.source,
+      amount: amt,
+      expected_date: transferDraft.expected_date || null,
+    }).select().single();
+    if (!data) return;
+    const updated = [...(transfers[scenarioId] ?? []), data];
+    setTransfers(prev => ({ ...prev, [scenarioId]: updated }));
+    await syncAdjustments(scenarioId, actions[scenarioId] ?? [], updated);
+    setShowTransferFormFor(null);
+    setTransferDraft({ description: '', source: '', amount: '', expected_date: '' });
+  }
+
+  async function removeTransfer(scenarioId: string, transferId: string) {
+    await supabase.from('pending_transfers').delete().eq('id', transferId);
+    const updated = (transfers[scenarioId] ?? []).filter(t => t.id !== transferId);
+    setTransfers(prev => ({ ...prev, [scenarioId]: updated }));
+    await syncAdjustments(scenarioId, actions[scenarioId] ?? [], updated);
   }
 
   async function persistAndSync(scenarioId: string, form: { action_type: ScenarioActionType; label: string; counterparty: string; amount: number; notes: string }) {
@@ -591,7 +632,7 @@ export default function Scenarios({ scheme }: Props) {
   const stackedAdj = activeScenarios.length > 0
     ? activeScenarios.reduce(
         (acc, sc) => {
-          const d = deriveAdjustments(actions[sc.id] ?? [], nav);
+          const d = deriveAdjustments(actions[sc.id] ?? [], nav, transfers[sc.id] ?? []);
           return {
             navDelta: acc.navDelta + d.navDelta,
             navAdjPct: acc.navAdjPct + d.navAdjPct,
@@ -644,7 +685,7 @@ export default function Scenarios({ scheme }: Props) {
         <div className="space-y-4">
           {scenarios.map(sc => {
             const scActions = actions[sc.id] ?? [];
-            const adj = deriveAdjustments(scActions, nav);
+            const adj = deriveAdjustments(scActions, nav, transfers[sc.id] ?? []);
             const scNav = nav + adj.navDelta;
             const scCash = cash + adj.cashDelta;
             const scLoanbacks = totals.loanbacks + adj.loanbackDelta;
@@ -852,12 +893,129 @@ export default function Scenarios({ scheme }: Props) {
                     />
                   )}
 
+                  {/* Pending Transfers section */}
+                  <div className="mt-3 pt-3 border-t border-gray-100">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-1.5">
+                        <CalendarClock size={13} className="text-gray-400" />
+                        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Pending Transfers & Pension Payments</h4>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setShowTransferFormFor(prev => prev === sc.id ? null : sc.id);
+                          setTransferDraft({ description: '', source: '', amount: '', expected_date: '' });
+                        }}
+                        className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
+                      >
+                        <Plus size={11} /> Add Transfer
+                      </button>
+                    </div>
+
+                    {(transfers[sc.id] ?? []).length > 0 && (
+                      <div className="space-y-1.5">
+                        {(transfers[sc.id] ?? []).map(t => (
+                          <div key={t.id} className="flex items-center gap-3 p-2.5 rounded-lg border border-emerald-100 bg-emerald-50/50">
+                            <ArrowDownCircle size={14} className="text-emerald-600 shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-baseline gap-2 flex-wrap">
+                                <span className="text-xs font-semibold text-gray-800">{t.description || 'Transfer'}</span>
+                                {t.source && <span className="text-xs text-gray-500">— {t.source}</span>}
+                              </div>
+                              <div className="flex flex-wrap gap-3 mt-0.5 text-xs">
+                                <span className="font-medium text-emerald-700">+{fmtFull(Number(t.amount))}</span>
+                                {t.expected_date && <span className="text-gray-400">{new Date(t.expected_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>}
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => removeTransfer(sc.id, t.id)}
+                              className="p-1 rounded hover:bg-black/10 transition-colors shrink-0"
+                              title="Remove"
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {showTransferFormFor === sc.id && (
+                      <div className="mt-2 p-3 rounded-lg border border-gray-200 bg-gray-50/50 space-y-2.5">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-0.5">Description</label>
+                            <input
+                              type="text"
+                              value={transferDraft.description}
+                              onChange={e => setTransferDraft(d => ({ ...d, description: e.target.value }))}
+                              placeholder="e.g. Employer pension contribution"
+                              className="w-full text-xs border border-gray-200 rounded-md px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-gray-900"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-0.5">Source</label>
+                            <input
+                              type="text"
+                              value={transferDraft.source}
+                              onChange={e => setTransferDraft(d => ({ ...d, source: e.target.value }))}
+                              placeholder="e.g. Metro Bank, HMRC"
+                              className="w-full text-xs border border-gray-200 rounded-md px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-gray-900"
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-0.5">Amount (£)</label>
+                            <div className="relative">
+                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">£</span>
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                value={transferDraft.amount}
+                                onChange={e => setTransferDraft(d => ({ ...d, amount: e.target.value }))}
+                                placeholder="0"
+                                className="w-full pl-5 text-xs border border-gray-200 rounded-md px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-gray-900"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-0.5">Expected Date</label>
+                            <input
+                              type="date"
+                              value={transferDraft.expected_date}
+                              onChange={e => setTransferDraft(d => ({ ...d, expected_date: e.target.value }))}
+                              className="w-full text-xs border border-gray-200 rounded-md px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-gray-900"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => addTransfer(sc.id)}
+                            className="flex items-center gap-1 px-3 py-1 bg-gray-900 text-white rounded-md text-xs font-semibold hover:bg-gray-800 transition-colors"
+                          >
+                            <Check size={11} /> Add
+                          </button>
+                          <button
+                            onClick={() => setShowTransferFormFor(null)}
+                            className="px-3 py-1 border border-gray-200 rounded-md text-xs hover:bg-gray-100 transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {(transfers[sc.id] ?? []).length === 0 && showTransferFormFor !== sc.id && (
+                      <p className="text-xs text-gray-400 italic">No pending transfers. Add future transfers and pension payments here.</p>
+                    )}
+                  </div>
+
                   {/* Per-scenario impact summary */}
-                  {scActions.length > 0 && (
-                    <div className="mt-1 pt-3 border-t border-gray-100 grid grid-cols-2 sm:grid-cols-5 gap-3">
+                  {(scActions.length > 0 || (transfers[sc.id] ?? []).length > 0) && (
+                    <div className="mt-1 pt-3 border-t border-gray-100 grid grid-cols-2 sm:grid-cols-6 gap-3">
                       {[
                         { label: 'Scenario Cash', value: scCash, delta: adj.cashDelta },
                         { label: 'Scenario NAV', value: scNav, delta: adj.navDelta },
+                        { label: 'Pending Transfers', value: null, delta: (transfers[sc.id] ?? []).reduce((s, t) => s + Number(t.amount), 0) },
                         { label: 'Loanback Impact', value: null, delta: adj.loanbackDelta },
                         { label: 'Borrowing Impact', value: null, delta: adj.borrowingDelta },
                         { label: 'Employer Inv. Impact', value: null, delta: adj.employerDelta },
@@ -945,7 +1103,7 @@ export default function Scenarios({ scheme }: Props) {
                 ];
                 let running = cash;
                 for (const sc of activeScenarios) {
-                  const d = deriveAdjustments(actions[sc.id] ?? [], nav);
+                  const d = deriveAdjustments(actions[sc.id] ?? [], nav, transfers[sc.id] ?? []);
                   running += d.cashDelta;
                   waterfallSteps.push({
                     label: sc.scenario_name,
