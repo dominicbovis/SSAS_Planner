@@ -62,6 +62,11 @@ function CashInput({ value, onCommit }: { value: number; onCommit: (v: number) =
   );
 }
 
+function bankTotal(edit: Partial<SsasScheme>, scheme: SsasScheme): number {
+  const get = (k: keyof SsasScheme) => Number((edit as Record<string, unknown>)[k as string] ?? scheme[k] ?? 0);
+  return get('metro_bank_balance') + get('cater_allen_balance') + get('utb_balance');
+}
+
 function gaugeColor(value: number, max: number, warnThreshold = 0.9): 'red' | 'amber' | 'green' {
   if (value > max) return 'red';
   if (value > max * warnThreshold) return 'amber';
@@ -106,7 +111,7 @@ export default function Dashboard({ scheme, onSchemeUpdate }: DashboardProps) {
     const employer = empData.reduce((s, r) => s + Number(r.amount), 0);
     const fundsTotal = (funds.data ?? []).reduce((s, r) => s + Number(r.current_value), 0);
 
-    const cash = Number(scheme.cash_balance);
+    const cash = Number(scheme.metro_bank_balance) + Number(scheme.cater_allen_balance) + Number(scheme.utb_balance);
     const totalAssets = cash + property + loanbacks + thirdParty + employer + fundsTotal
       + (manAssets.data ?? []).reduce((s, r) => s + Number(r.market_value), 0);
     const totalLiabilities = borrowing
@@ -122,7 +127,7 @@ export default function Dashboard({ scheme, onSchemeUpdate }: DashboardProps) {
   }
 
   const nav = totals.computedNav;
-  const cash = Number(scheme.cash_balance);
+  const cash = Number(scheme.metro_bank_balance) + Number(scheme.cater_allen_balance) + Number(scheme.utb_balance);
 
   const maxLoanback = 0.5 * nav;
   const maxBorrowing = 0.5 * nav;
@@ -234,12 +239,44 @@ export default function Dashboard({ scheme, onSchemeUpdate }: DashboardProps) {
             <p className="text-[10px] text-gray-400 leading-tight">Auto-calculated from NAV Tracker</p>
           </div>
           <div className="space-y-1">
-            <label className="text-xs text-gray-500 font-medium">Cash Balance</label>
+            <label className="text-xs text-gray-500 font-medium">Metro Bank</label>
             <CashInput
-              value={Number(schemeVal('cash_balance'))}
-              onCommit={v => setEditing(p => ({ ...p, cash_balance: v }))}
+              value={Number(schemeVal('metro_bank_balance'))}
+              onCommit={v => setEditing(p => {
+                const next = { ...p, metro_bank_balance: v };
+                next.cash_balance = bankTotal(next, scheme);
+                return next;
+              })}
             />
           </div>
+          <div className="space-y-1">
+            <label className="text-xs text-gray-500 font-medium">Cater Allen</label>
+            <CashInput
+              value={Number(schemeVal('cater_allen_balance'))}
+              onCommit={v => setEditing(p => {
+                const next = { ...p, cater_allen_balance: v };
+                next.cash_balance = bankTotal(next, scheme);
+                return next;
+              })}
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-gray-500 font-medium">UTB</label>
+            <CashInput
+              value={Number(schemeVal('utb_balance'))}
+              onCommit={v => setEditing(p => {
+                const next = { ...p, utb_balance: v };
+                next.cash_balance = bankTotal(next, scheme);
+                return next;
+              })}
+            />
+          </div>
+        </div>
+
+        {/* Cash balance total */}
+        <div className="flex items-center justify-end gap-2 mt-4 pt-4 border-t border-gray-100">
+          <span className="text-xs text-gray-500 font-medium">Total Cash Balance:</span>
+          <span className="text-sm font-bold text-gray-900">{fmtFull(Number(schemeVal('cash_balance')))}</span>
         </div>
 
         {/* Read-only totals */}

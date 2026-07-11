@@ -138,6 +138,9 @@ export interface SsasScheme {
   snapshot_date: string;
   net_asset_value: number;
   cash_balance: number;
+  metro_bank_balance: number;
+  cater_allen_balance: number;
+  utb_balance: number;
   created_at: string;
   updated_at: string;
 }
