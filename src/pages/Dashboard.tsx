@@ -169,7 +169,7 @@ export default function Dashboard({ scheme, onSchemeUpdate }: DashboardProps) {
         case 'cash_out': scenarioCashDelta -= amt; scenarioNavDelta -= amt; break;
         case 'property_purchase': {
           const assetVal = a.asset_value != null ? Number(a.asset_value) : amt;
-          scenarioNavDelta += assetVal;
+          scenarioNavDelta += assetVal - amt;
           scenarioCashDelta -= amt;
           break;
         }

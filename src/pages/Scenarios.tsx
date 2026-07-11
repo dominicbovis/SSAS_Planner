@@ -85,7 +85,7 @@ function actionToAdjustments(action: ScenarioAction): {
   const assetVal = action.asset_value != null ? Number(action.asset_value) : amt;
   switch (action.action_type) {
     case 'property_purchase':
-      return { navDelta: assetVal, loanbackDelta: 0, borrowingDelta: 0, employerDelta: 0, cashDelta: -amt };
+      return { navDelta: assetVal - amt, loanbackDelta: 0, borrowingDelta: 0, employerDelta: 0, cashDelta: -amt };
     case 'loanback':
       return { navDelta: 0, loanbackDelta: amt, borrowingDelta: 0, employerDelta: 0, cashDelta: -amt };
     case 'repay_loanback':
