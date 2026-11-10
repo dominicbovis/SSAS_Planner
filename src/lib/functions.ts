@@ -2,7 +2,7 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 
 export async function callEdgeFunction<T>(
   name: string,
-  accessToken: string,
+  accessToken: string | null,
   body: Record<string, unknown>,
 ): Promise<T> {
   let res: Response;
@@ -11,7 +11,7 @@ export async function callEdgeFunction<T>(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       },
       body: JSON.stringify(body),
     });

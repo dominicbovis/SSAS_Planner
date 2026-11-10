@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { ArrowRight, Loader2, Mail, Lock, ArrowLeft } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { callEdgeFunction } from '../lib/functions';
 import { ErrorBox, Field, inputClass } from '../components/AuthFields';
 
 type Mode = 'sign-in' | 'forgot';
@@ -41,18 +42,17 @@ export default function SignIn() {
     e.preventDefault();
     setBusy(true);
     setError(null);
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: window.location.origin,
-    });
-    setBusy(false);
-    if (resetError) {
-      setError(
-        resetError.status === 429
-          ? 'Too many reset emails were requested recently. Please wait a few minutes and try again.'
-          : 'We could not send the reset email right now. Please try again shortly, or ask your administrator.',
-      );
+    try {
+      await callEdgeFunction('send-password-reset', null, {
+        email: email.trim(),
+        redirectTo: window.location.origin,
+      });
+    } catch (err) {
+      setBusy(false);
+      setError(err instanceof Error ? err.message : 'We could not send the reset email right now. Please try again shortly.');
       return;
     }
+    setBusy(false);
     setNotice('If that address has an account, a link to set a new password is on its way.');
   }
 

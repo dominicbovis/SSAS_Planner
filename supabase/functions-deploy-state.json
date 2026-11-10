@@ -1,17 +1,21 @@
 {
   "projectId": "66103038",
   "functions": {
+    "admin-users": {
+      "hasChanged": false,
+      "hash": "85164267258832e409eb2fb7313926ba0f7b26ef75509695cb17c49ff0116804"
+    },
     "ask-claude": {
       "hasChanged": false,
       "hash": "f653d80da74c3a356a1f6547fe50e3fda4220529a658a83d6c6e62192a5b59a0"
     },
-    "admin-users": {
-      "hasChanged": false,
-      "hash": "f3dd48356fdaf42489ae78fb57b8dfd07807682c98f4990a2edcec9c5679dd3c"
-    },
     "share-planner": {
       "hasChanged": false,
-      "hash": "1b344d4140edfe24c97aa99e68350e6bc3110bff7e9b79e98c73bdb2c9d72d1f"
+      "hash": "3831447583338ad502415c23851ae1c00d8626f062c387ade869995496dd633d"
+    },
+    "send-password-reset": {
+      "hasChanged": false,
+      "hash": "f4ba294d593e91c91a825e6ddfcee2879ff1f18658646a2fa005f4c9bff38540"
     }
   }
 }
