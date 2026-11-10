@@ -3,7 +3,7 @@
   "functions": {
     "admin-users": {
       "hasChanged": false,
-      "hash": "85164267258832e409eb2fb7313926ba0f7b26ef75509695cb17c49ff0116804"
+      "hash": "26e0bde45e73658ee90cafeaba73deb1776d02909710a87984dc71ac471f0aaa"
     },
     "ask-claude": {
       "hasChanged": false,
@@ -11,7 +11,7 @@
     },
     "send-password-reset": {
       "hasChanged": false,
-      "hash": "9651f10cbdec74c902849ff54262bf2b702db6e3a4cec9f88ff0b6175633d8cd"
+      "hash": "4ce38bfaaa61db475e5de14e7db4e54dba5ba29e0a71c76f37e98e7d72a29e5a"
     },
     "share-planner": {
       "hasChanged": false,

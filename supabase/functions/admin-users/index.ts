@@ -53,7 +53,7 @@ async function sendEmail(to: string, subject: string, paragraphs: string[], ctaL
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      from: "Red Horizons SSAS Planner <noreply@redhorizons.co.uk>",
+      from: "Red Horizons SSAS Planner <noreply@notifications.redhorizons.co.uk>",
       to: [to],
       subject,
       html: renderEmailHtml(paragraphs, ctaLabel, ctaUrl),
