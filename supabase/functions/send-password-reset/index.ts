@@ -117,7 +117,7 @@ Deno.serve(async (req: Request) => {
         );
       } catch (sendError) {
         console.error(sendError);
-        return json({ error: "We could not send the reset email right now. Please try again shortly." }, 500);
+        return json({ error: "The reset email service is unavailable right now. Please contact your administrator." }, 503);
       }
     }
 

@@ -9,13 +9,13 @@
       "hasChanged": false,
       "hash": "f653d80da74c3a356a1f6547fe50e3fda4220529a658a83d6c6e62192a5b59a0"
     },
+    "send-password-reset": {
+      "hasChanged": false,
+      "hash": "9651f10cbdec74c902849ff54262bf2b702db6e3a4cec9f88ff0b6175633d8cd"
+    },
     "share-planner": {
       "hasChanged": false,
       "hash": "3831447583338ad502415c23851ae1c00d8626f062c387ade869995496dd633d"
-    },
-    "send-password-reset": {
-      "hasChanged": false,
-      "hash": "f4ba294d593e91c91a825e6ddfcee2879ff1f18658646a2fa005f4c9bff38540"
     }
   }
 }
