@@ -46,7 +46,11 @@ export default function SignIn() {
     });
     setBusy(false);
     if (resetError) {
-      setError('We could not send the reset link. Please try again in a moment.');
+      setError(
+        resetError.status === 429
+          ? 'Too many reset emails were requested recently. Please wait a few minutes and try again.'
+          : 'We could not send the reset email right now. Please try again shortly, or ask your administrator.',
+      );
       return;
     }
     setNotice('If that address has an account, a link to set a new password is on its way.');
