@@ -132,8 +132,37 @@ export interface LenderPackSettings {
   updated_at: string;
 }
 
+export interface Profile {
+  user_id: string;
+  email: string;
+  is_admin: boolean;
+  is_active: boolean;
+  must_set_password: boolean;
+  created_at: string;
+}
+
+export interface PlannerShare {
+  id: string;
+  scheme_id: string;
+  user_id: string;
+  email: string | null;
+  created_at: string;
+}
+
+export interface ManagedUser {
+  userId: string;
+  email: string;
+  isAdmin: boolean;
+  isActive: boolean;
+  mustSetPassword: boolean;
+  createdAt: string;
+  lastSignInAt: string | null;
+  plannerName: string | null;
+}
+
 export interface SsasScheme {
   id: string;
+  owner_id: string | null;
   name: string;
   snapshot_date: string;
   net_asset_value: number;

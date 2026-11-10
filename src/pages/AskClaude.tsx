@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Bot, User, Sparkles, RotateCcw, Copy, Check, Plus, MessageSquare, Trash2, ChevronLeft, X } from 'lucide-react';
+import { Send, Bot, User, Sparkles, Copy, Check, Plus, MessageSquare, Trash2, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../lib/AuthContext';
 import { SsasScheme, ChatSession, ChatMessageRecord } from '../types';
-import { fmtFull, fmt } from '../lib/format';
+import { fmtFull } from '../lib/format';
 
 interface Message {
   id: string;
@@ -46,6 +47,7 @@ function deriveTitle(text: string): string {
 }
 
 export default function AskClaude({ scheme, scenarioContext }: Props) {
+  const { session } = useAuth();
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -177,6 +179,13 @@ export default function AskClaude({ scheme, scenarioContext }: Props) {
       .eq('id', sessionId)
       .then(() => loadSessions());
 
+    const accessToken = session?.access_token;
+    if (!accessToken) {
+      setMessages(prev => prev.filter(m => m.id !== assistantId));
+      setLoading(false);
+      return;
+    }
+
     const historyForApi = [...messages, userMsg].map(m => ({
       role: m.role,
       content: m.content,
@@ -191,7 +200,7 @@ export default function AskClaude({ scheme, scenarioContext }: Props) {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            'Authorization': `Bearer ${accessToken}`,
           },
           body: JSON.stringify({
             messages: historyForApi,

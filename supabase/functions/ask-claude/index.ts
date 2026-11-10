@@ -16,9 +16,28 @@ interface RequestBody {
   schemeContext: string;
 }
 
+async function getSignedInUserId(req: Request): Promise<string | null> {
+  const token = req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "");
+  if (!token) return null;
+  const res = await fetch(`${Deno.env.get("SUPABASE_URL")}/auth/v1/user`, {
+    headers: { Authorization: `Bearer ${token}`, apikey: Deno.env.get("SUPABASE_ANON_KEY") ?? "" },
+  });
+  if (!res.ok) return null;
+  const user = await res.json();
+  return typeof user?.id === "string" ? user.id : null;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
+  }
+
+  const userId = await getSignedInUserId(req);
+  if (!userId) {
+    return new Response(
+      JSON.stringify({ error: "Please sign in to use Ask Claude" }),
+      { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
   }
 
   const apiKey = Deno.env.get("ANTHROPIC_API_KEY");

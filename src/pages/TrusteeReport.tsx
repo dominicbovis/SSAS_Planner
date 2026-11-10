@@ -14,10 +14,6 @@ function fmtFull(v: number) {
   return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 2 }).format(v);
 }
 
-function pct(v: number) {
-  return `${(v * 100).toFixed(1)}%`;
-}
-
 function addMonths(dateStr: string, months: number): string {
   const d = new Date(dateStr);
   d.setMonth(d.getMonth() + months);

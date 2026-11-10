@@ -478,10 +478,10 @@ function gaugeColor(value: number, max: number): 'red' | 'amber' | 'green' {
 
 // ─── Main component ──────────────────────────────────────────────────────────
 
-interface Props { scheme: SsasScheme; }
+interface Props { scheme: SsasScheme; readOnly: boolean; }
 interface Totals { loanbacks: number; borrowing: number; employer: number; }
 
-export default function Scenarios({ scheme }: Props) {
+export default function Scenarios({ scheme, readOnly }: Props) {
   const [scenarios, setScenarios] = useState<ScenarioRecord[]>([]);
   const [actions, setActions] = useState<Record<string, ScenarioAction[]>>({});
   const [totals, setTotals] = useState<Totals>({ loanbacks: 0, borrowing: 0, employer: 0 });
@@ -753,6 +753,7 @@ export default function Scenarios({ scheme }: Props) {
 
   return (
     <div className="space-y-6">
+      <fieldset disabled={readOnly} className="contents">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Scenarios</h1>
@@ -1328,6 +1329,8 @@ export default function Scenarios({ scheme }: Props) {
           Activate one or more scenarios above to view stacked gauge outputs and capacity analysis.
         </div>
       )}
+
+      </fieldset>
 
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mt-6">
         <div className="flex items-center gap-2 mb-1">

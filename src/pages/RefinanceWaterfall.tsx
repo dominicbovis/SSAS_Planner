@@ -31,7 +31,7 @@ const defaultDraft = (schemeId: string): Omit<RefinanceWaterfallSettings, 'id' |
 export default function RefinanceWaterfall({ scheme }: Props) {
   const [settings, setSettings] = useState<RefinanceWaterfallSettings | null>(null);
   const [draft, setDraft] = useState<Omit<RefinanceWaterfallSettings, 'id' | 'created_at' | 'updated_at'>>(defaultDraft(scheme.id));
-  const [borrowings, setBorrowings] = useState<BorrowingRow[]>([]);
+  const [, setBorrowings] = useState<BorrowingRow[]>([]);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 

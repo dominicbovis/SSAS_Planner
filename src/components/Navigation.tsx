@@ -16,6 +16,9 @@ import {
   Anchor,
   ClipboardList,
   Scale,
+  LogOut,
+  Share2,
+  UsersRound,
 } from 'lucide-react';
 
 export type Page =
@@ -36,7 +39,9 @@ export type Page =
   | 'lender-pack'
   | 'refinance-waterfall'
   | 'lender-pack-bridging'
-  | 'lender-pack-term';
+  | 'lender-pack-term'
+  | 'users-access'
+  | 'share-planner';
 
 interface NavItem {
   id: Page;
@@ -69,10 +74,20 @@ const items: NavItem[] = [
 interface NavigationProps {
   current: Page;
   onChange: (p: Page) => void;
+  plannerName: string;
+  userEmail: string;
+  isAdmin: boolean;
+  isOwner: boolean;
+  onSignOut: () => void;
 }
 
-export default function Navigation({ current, onChange }: NavigationProps) {
+export default function Navigation({ current, onChange, plannerName, userEmail, isAdmin, isOwner, onSignOut }: NavigationProps) {
   let lastGroup = '';
+
+  const accountItems: NavItem[] = [
+    ...(isAdmin ? [{ id: 'users-access' as Page, label: 'Users and Access', icon: UsersRound, group: 'Account' }] : []),
+    ...(isOwner ? [{ id: 'share-planner' as Page, label: 'Share planner', icon: Share2, group: 'Account' }] : []),
+  ];
 
   return (
     <aside className="w-60 shrink-0 bg-gray-950 flex flex-col min-h-screen">
@@ -82,8 +97,8 @@ export default function Navigation({ current, onChange }: NavigationProps) {
           <div className="w-8 h-8 rounded-lg bg-red-600 flex items-center justify-center shrink-0">
             <span className="text-white font-black text-sm">RH</span>
           </div>
-          <div>
-            <p className="text-white font-bold text-sm leading-tight">Red Horizons</p>
+          <div className="min-w-0">
+            <p className="text-white font-bold text-sm leading-tight truncate">{plannerName}</p>
             <p className="text-gray-400 text-xs">SSAS Planner</p>
           </div>
         </div>
@@ -91,7 +106,7 @@ export default function Navigation({ current, onChange }: NavigationProps) {
 
       {/* Nav items */}
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        {items.map(item => {
+        {[...items, ...accountItems].map(item => {
           const showGroup = item.group !== lastGroup;
           lastGroup = item.group ?? '';
           const active = current === item.id;
@@ -120,7 +135,15 @@ export default function Navigation({ current, onChange }: NavigationProps) {
       </nav>
 
       {/* Footer */}
-      <div className="px-5 py-4 border-t border-gray-800">
+      <div className="px-5 py-4 border-t border-gray-800 space-y-3">
+        <p className="text-gray-400 text-xs truncate" title={userEmail}>{userEmail}</p>
+        <button
+          onClick={onSignOut}
+          className="inline-flex items-center gap-2 text-gray-400 hover:text-white text-xs font-medium transition-colors duration-150"
+        >
+          <LogOut size={14} />
+          Sign out
+        </button>
         <p className="text-gray-600 text-[10px]">© 2026 Red Horizons</p>
       </div>
     </aside>

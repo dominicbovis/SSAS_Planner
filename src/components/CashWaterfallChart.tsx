@@ -67,7 +67,7 @@ export default function CashWaterfallChart({ steps }: CashWaterfallChartProps) {
           let barTop: number;
           let barBottom: number;
           let fillColor: string;
-          let fillOpacity = 0.9;
+          const fillOpacity = 0.9;
 
           if (step.type === 'base' || step.type === 'total') {
             barTop = yScale(step.runningTotal);

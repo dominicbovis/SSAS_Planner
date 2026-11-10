@@ -2,7 +2,6 @@ import { useEffect, useState, useCallback } from 'react';
 import { Printer, Save, Plus, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { SsasScheme, BridgingLenderPackSettings, SecurityRow, BridgingExitScenario } from '../types';
-import StatusBadge from '../components/StatusBadge';
 
 import CurrencyInput from '../components/CurrencyInput';
 import { fmt, fmtFull } from '../lib/format';
@@ -11,7 +10,6 @@ function pctFmt(v: number) { return `${v.toFixed(2)}%`; }
 
 const inputCls = 'w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 bg-white';
 const labelCls = 'block text-xs font-medium text-gray-500 mb-1';
-const textareaCls = 'w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 resize-none bg-white';
 
 const emptySecurity = (): SecurityRow => ({
   asset_type: 'Property', asset_name: '', value: 0, charge_rank: '1st', existing_charges: '', net_realisation_value: 0,

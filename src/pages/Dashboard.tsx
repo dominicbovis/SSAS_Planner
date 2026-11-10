@@ -4,7 +4,6 @@ import { supabase } from '../lib/supabase';
 import { SsasScheme, ScenarioRecord, ScenarioAction, PendingTransfer } from '../types';
 import GaugeChart from '../components/GaugeChart';
 import StatusBadge from '../components/StatusBadge';
-import CurrencyInput from '../components/CurrencyInput';
 import { fmt, fmtFull } from '../lib/format';
 
 const PIE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316'];
